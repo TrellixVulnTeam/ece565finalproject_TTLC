@@ -91,7 +91,7 @@ FsWorkload::FsWorkload(Params *p) : KernelWorkload(*p)
              "Can't find a matching boot loader / kernel combination!");
 
     if (bootldr)
-        Loader::debugSymbolTable.insert(*bootldr->symtab().globals());
+        bootldr->loadGlobalSymbols(Loader::debugSymbolTable);
 }
 
 void
@@ -103,7 +103,7 @@ FsWorkload::initState()
 
     // FPEXC.EN = 0
 
-    for (auto *tc: system->threads) {
+    for (auto *tc: system->threadContexts) {
         Reset().invoke(tc);
         tc->activate();
     }
@@ -126,7 +126,7 @@ FsWorkload::initState()
         fatal_if(!arm_sys->params()->gic_cpu_addr && is_gic_v2,
                  "gic_cpu_addr must be set with bootloader");
 
-        for (auto *tc: arm_sys->threads) {
+        for (auto tc: arm_sys->threadContexts) {
             if (!arm_sys->highestELIs64())
                 tc->setIntReg(3, kernelEntry);
             if (is_gic_v2)
@@ -137,7 +137,7 @@ FsWorkload::initState()
     } else {
         // Set the initial PC to be at start of the kernel code
         if (!arm_sys->highestELIs64())
-            arm_sys->threads[0]->pcState(kernelObj->entryPoint());
+            arm_sys->threadContexts[0]->pcState(kernelObj->entryPoint());
     }
 }
 

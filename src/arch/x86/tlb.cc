@@ -61,7 +61,7 @@ namespace X86ISA {
 
 TLB::TLB(const Params *p)
     : BaseTLB(p), configAddress(0), size(p->size),
-      tlb(size), lruSeq(0), m5opRange(p->system->m5opRange()), stats(this)
+      tlb(size), lruSeq(0), m5opRange(p->system->m5opRange())
 {
     if (!size)
         fatal("TLBs must have a non-zero size.\n");
@@ -268,7 +268,7 @@ TLB::finalizePhysical(const RequestPtr &req,
             [func, mode](ThreadContext *tc, PacketPtr pkt) -> Cycles
             {
                 uint64_t ret;
-                PseudoInst::pseudoInst<X86PseudoInstABI, true>(tc, func, ret);
+                PseudoInst::pseudoInst<X86PseudoInstABI>(tc, func, ret);
                 if (mode == Read)
                     pkt->setLE(ret);
                 return Cycles(1);
@@ -373,18 +373,18 @@ TLB::translate(const RequestPtr &req,
             // The vaddr already has the segment base applied.
             TlbEntry *entry = lookup(vaddr);
             if (mode == Read) {
-                stats.rdAccesses++;
+                rdAccesses++;
             } else {
-                stats.wrAccesses++;
+                wrAccesses++;
             }
             if (!entry) {
                 DPRINTF(TLB, "Handling a TLB miss for "
                         "address %#x at pc %#x.\n",
                         vaddr, tc->instAddr());
                 if (mode == Read) {
-                    stats.rdMisses++;
+                    rdMisses++;
                 } else {
-                    stats.wrMisses++;
+                    wrMisses++;
                 }
                 if (FullSystem) {
                     Fault fault = walker->start(tc, translation, req, mode);
@@ -518,13 +518,27 @@ TLB::getWalker()
     return walker;
 }
 
-TLB::TlbStats::TlbStats(Stats::Group *parent)
-  : Stats::Group(parent),
-    ADD_STAT(rdAccesses, "TLB accesses on read requests"),
-    ADD_STAT(wrAccesses, "TLB accesses on write requests"),
-    ADD_STAT(rdMisses, "TLB misses on read requests"),
-    ADD_STAT(wrMisses, "TLB misses on write requests")
+void
+TLB::regStats()
 {
+    using namespace Stats;
+    BaseTLB::regStats();
+    rdAccesses
+        .name(name() + ".rdAccesses")
+        .desc("TLB accesses on read requests");
+
+    wrAccesses
+        .name(name() + ".wrAccesses")
+        .desc("TLB accesses on write requests");
+
+    rdMisses
+        .name(name() + ".rdMisses")
+        .desc("TLB misses on read requests");
+
+    wrMisses
+        .name(name() + ".wrMisses")
+        .desc("TLB misses on write requests");
+
 }
 
 void

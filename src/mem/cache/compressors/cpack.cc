@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018-2020 Inria
+ * Copyright (c) 2018-2019 Inria
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -35,8 +35,6 @@
 #include "mem/cache/compressors/dictionary_compressor_impl.hh"
 #include "params/CPack.hh"
 
-namespace Compressor {
-
 CPack::CPack(const Params *p)
     : DictionaryCompressor<uint32_t>(p)
 {
@@ -49,12 +47,11 @@ CPack::addToDictionary(DictionaryEntry data)
     dictionary[numEntries++] = data;
 }
 
-std::unique_ptr<Base::CompressionData>
-CPack::compress(const std::vector<Chunk>& chunks,
-    Cycles& comp_lat, Cycles& decomp_lat)
+std::unique_ptr<BaseCacheCompressor::CompressionData>
+CPack::compress(const uint64_t* data, Cycles& comp_lat, Cycles& decomp_lat)
 {
-    std::unique_ptr<Base::CompressionData> comp_data =
-        DictionaryCompressor<uint32_t>::compress(chunks);
+    std::unique_ptr<BaseCacheCompressor::CompressionData> comp_data =
+        DictionaryCompressor<uint32_t>::compress(data);
 
     // Set compression latency (Accounts for pattern matching, length
     // generation, packaging and shifting)
@@ -67,10 +64,8 @@ CPack::compress(const std::vector<Chunk>& chunks,
     return comp_data;
 }
 
-} // namespace Compressor
-
-Compressor::CPack*
+CPack*
 CPackParams::create()
 {
-    return new Compressor::CPack(this);
+    return new CPack(this);
 }

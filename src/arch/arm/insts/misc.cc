@@ -40,8 +40,6 @@
 
 #include "cpu/reg_class.hh"
 
-using namespace ArmISA;
-
 std::string
 MrsOp::generateDisassembly(Addr pc, const Loader::SymbolTable *symtab) const
 {

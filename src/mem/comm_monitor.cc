@@ -45,8 +45,8 @@
 
 CommMonitor::CommMonitor(Params* params)
     : SimObject(params),
-      memSidePort(name() + "-mem_side_port", *this),
-      cpuSidePort(name() + "-cpu_side_port", *this),
+      masterPort(name() + "-master", *this),
+      slavePort(name() + "-slave", *this),
       samplePeriodicEvent([this]{ samplePeriodic(); }, name()),
       samplePeriodTicks(params->sample_period),
       samplePeriod(params->sample_period / SimClock::Float::s),
@@ -67,7 +67,7 @@ void
 CommMonitor::init()
 {
     // make sure both sides of the monitor are connected
-    if (!cpuSidePort.isConnected() || !memSidePort.isConnected())
+    if (!slavePort.isConnected() || !masterPort.isConnected())
         fatal("Communication monitor is not connected on both sides.\n");
 }
 
@@ -81,10 +81,10 @@ CommMonitor::regProbePoints()
 Port &
 CommMonitor::getPort(const std::string &if_name, PortID idx)
 {
-    if (if_name == "mem_side_port") {
-        return memSidePort;
-    } else if (if_name == "cpu_side_port") {
-        return cpuSidePort;
+    if (if_name == "master") {
+        return masterPort;
+    } else if (if_name == "slave") {
+        return slavePort;
     } else {
         return SimObject::getPort(if_name, idx);
     }
@@ -93,13 +93,13 @@ CommMonitor::getPort(const std::string &if_name, PortID idx)
 void
 CommMonitor::recvFunctional(PacketPtr pkt)
 {
-    memSidePort.sendFunctional(pkt);
+    masterPort.sendFunctional(pkt);
 }
 
 void
 CommMonitor::recvFunctionalSnoop(PacketPtr pkt)
 {
-    cpuSidePort.sendFunctionalSnoop(pkt);
+    slavePort.sendFunctionalSnoop(pkt);
 }
 
 CommMonitor::MonitorStats::MonitorStats(Stats::Group *parent,
@@ -344,7 +344,7 @@ CommMonitor::recvAtomic(PacketPtr pkt)
     ProbePoints::PacketInfo req_pkt_info(pkt);
     ppPktReq->notify(req_pkt_info);
 
-    const Tick delay(memSidePort.sendAtomic(pkt));
+    const Tick delay(masterPort.sendAtomic(pkt));
 
     stats.updateReqStats(req_pkt_info, true, expects_response);
     if (expects_response)
@@ -360,7 +360,7 @@ CommMonitor::recvAtomic(PacketPtr pkt)
 Tick
 CommMonitor::recvAtomicSnoop(PacketPtr pkt)
 {
-    return cpuSidePort.sendAtomicSnoop(pkt);
+    return slavePort.sendAtomicSnoop(pkt);
 }
 
 bool
@@ -385,7 +385,7 @@ CommMonitor::recvTimingReq(PacketPtr pkt)
     }
 
     // Attempt to send the packet
-    bool successful = memSidePort.sendTimingReq(pkt);
+    bool successful = masterPort.sendTimingReq(pkt);
 
     // If not successful, restore the sender state
     if (!successful && expects_response && !stats.disableLatencyHists) {
@@ -428,7 +428,7 @@ CommMonitor::recvTimingResp(PacketPtr pkt)
     }
 
     // Attempt to send the packet
-    bool successful = cpuSidePort.sendTimingResp(pkt);
+    bool successful = slavePort.sendTimingResp(pkt);
 
     if (!stats.disableLatencyHists) {
         // If packet successfully send, sample value of latency,
@@ -456,57 +456,57 @@ CommMonitor::recvTimingResp(PacketPtr pkt)
 void
 CommMonitor::recvTimingSnoopReq(PacketPtr pkt)
 {
-    cpuSidePort.sendTimingSnoopReq(pkt);
+    slavePort.sendTimingSnoopReq(pkt);
 }
 
 bool
 CommMonitor::recvTimingSnoopResp(PacketPtr pkt)
 {
-    return memSidePort.sendTimingSnoopResp(pkt);
+    return masterPort.sendTimingSnoopResp(pkt);
 }
 
 void
 CommMonitor::recvRetrySnoopResp()
 {
-    cpuSidePort.sendRetrySnoopResp();
+    slavePort.sendRetrySnoopResp();
 }
 
 bool
 CommMonitor::isSnooping() const
 {
-    // check if the connected request port is snooping
-    return cpuSidePort.isSnooping();
+    // check if the connected master port is snooping
+    return slavePort.isSnooping();
 }
 
 AddrRangeList
 CommMonitor::getAddrRanges() const
 {
-    // get the address ranges of the connected CPU-side port
-    return memSidePort.getAddrRanges();
+    // get the address ranges of the connected slave port
+    return masterPort.getAddrRanges();
 }
 
 void
 CommMonitor::recvReqRetry()
 {
-    cpuSidePort.sendRetryReq();
+    slavePort.sendRetryReq();
 }
 
 void
 CommMonitor::recvRespRetry()
 {
-    memSidePort.sendRetryResp();
+    masterPort.sendRetryResp();
 }
 
 bool
 CommMonitor::tryTiming(PacketPtr pkt)
 {
-    return memSidePort.tryTiming(pkt);
+    return masterPort.tryTiming(pkt);
 }
 
 void
 CommMonitor::recvRangeChange()
 {
-    cpuSidePort.sendRangeChange();
+    slavePort.sendRangeChange();
 }
 
 void

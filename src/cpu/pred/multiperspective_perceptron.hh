@@ -1029,7 +1029,7 @@ class MultiperspectivePerceptron : public BPredUnit
     void update(ThreadID tid, Addr instPC, bool taken,
             void *bp_history, bool squashed,
             const StaticInstPtr & inst,
-            Addr corrTarget) override;
+            Addr corrTarget = MaxAddr) override;
     void btbUpdate(ThreadID tid, Addr branch_addr, void* &bp_history) override;
 };
 #endif//__CPU_PRED_MULTIPERSPECTIVE_PERCEPTRON_HH__

@@ -32,7 +32,6 @@
 #include <memory>
 
 #include "params/FIFORP.hh"
-#include "sim/core.hh"
 
 FIFORP::FIFORP(const Params *p)
     : BaseReplacementPolicy(p)

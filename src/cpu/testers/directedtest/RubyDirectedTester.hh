@@ -47,7 +47,7 @@ class DirectedGenerator;
 class RubyDirectedTester : public ClockedObject
 {
   public:
-    class CpuPort : public RequestPort
+    class CpuPort : public MasterPort
     {
       private:
         RubyDirectedTester *tester;
@@ -55,7 +55,7 @@ class RubyDirectedTester : public ClockedObject
       public:
         CpuPort(const std::string &_name, RubyDirectedTester *_tester,
                 PortID _id)
-            : RequestPort(_name, _tester, _id), tester(_tester)
+            : MasterPort(_name, _tester, _id), tester(_tester)
         {}
 
       protected:
@@ -71,7 +71,7 @@ class RubyDirectedTester : public ClockedObject
     Port &getPort(const std::string &if_name,
                   PortID idx=InvalidPortID) override;
 
-    RequestPort* getCpuPort(int idx);
+    MasterPort* getCpuPort(int idx);
 
     void init() override;
 
@@ -98,7 +98,7 @@ class RubyDirectedTester : public ClockedObject
     RubyDirectedTester& operator=(const RubyDirectedTester& obj);
 
     uint64_t m_requests_completed;
-    std::vector<RequestPort*> ports;
+    std::vector<MasterPort*> ports;
     uint64_t m_requests_to_complete;
     DirectedGenerator* generator;
 };

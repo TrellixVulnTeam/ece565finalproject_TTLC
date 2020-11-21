@@ -43,7 +43,10 @@ namespace SparcISA {
 uint64_t
 getArgument(ThreadContext *tc, int &number, uint16_t size, bool fp)
 {
-    panic_if(!FullSystem, "getArgument() only implemented for full system");
+    if (!FullSystem) {
+        panic("getArgument() only implemented for full system\n");
+        M5_DUMMY_RETURN
+    }
 
     const int NumArgumentRegs = 6;
     if (number < NumArgumentRegs) {

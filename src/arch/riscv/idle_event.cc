@@ -28,6 +28,7 @@
 
 #include "arch/riscv/idle_event.hh"
 
+#include "arch/riscv/kernel_stats.hh"
 #include "cpu/thread_context.hh"
 
 using namespace RiscvISA;

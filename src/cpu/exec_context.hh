@@ -233,7 +233,7 @@ class ExecContext {
      */
     virtual Fault readMem(Addr addr, uint8_t *data, unsigned int size,
             Request::Flags flags,
-            const std::vector<bool>& byte_enable)
+            const std::vector<bool>& byte_enable = std::vector<bool>())
     {
         panic("ExecContext::readMem() should be overridden\n");
     }
@@ -247,23 +247,19 @@ class ExecContext {
      */
     virtual Fault initiateMemRead(Addr addr, unsigned int size,
             Request::Flags flags,
-            const std::vector<bool>& byte_enable)
+            const std::vector<bool>& byte_enable = std::vector<bool>())
     {
         panic("ExecContext::initiateMemRead() should be overridden\n");
     }
 
-    /**
-     * Initiate an HTM command,
-     * e.g. tell Ruby we're starting/stopping a transaction
-     */
-    virtual Fault initiateHtmCmd(Request::Flags flags) = 0;
     /**
      * For atomic-mode contexts, perform an atomic memory write operation.
      * For timing-mode contexts, initiate a timing memory write operation.
      */
     virtual Fault writeMem(uint8_t *data, unsigned int size, Addr addr,
                            Request::Flags flags, uint64_t *res,
-                           const std::vector<bool>& byte_enable) = 0;
+                           const std::vector<bool>& byte_enable =
+                               std::vector<bool>()) = 0;
 
     /**
      * For atomic-mode contexts, perform an atomic AMO (a.k.a., Atomic
@@ -299,6 +295,18 @@ class ExecContext {
 
     /** @} */
 
+    /**
+     * @{
+     * @name SysCall Emulation Interfaces
+     */
+
+    /**
+     * Executes a syscall.
+     */
+    virtual void syscall(Fault *fault) = 0;
+
+    /** @} */
+
     /** Returns a pointer to the ThreadContext. */
     virtual ThreadContext *tcBase() const = 0;
 
@@ -311,12 +319,6 @@ class ExecContext {
     virtual void setPredicate(bool val) = 0;
     virtual bool readMemAccPredicate() const = 0;
     virtual void setMemAccPredicate(bool val) = 0;
-
-    // hardware transactional memory
-    virtual uint64_t newHtmTransactionUid() const = 0;
-    virtual uint64_t getHtmTransactionUid() const = 0;
-    virtual bool inHtmTransactionalState() const = 0;
-    virtual uint64_t getHtmTransactionalDepth() const = 0;
 
     /** @} */
 

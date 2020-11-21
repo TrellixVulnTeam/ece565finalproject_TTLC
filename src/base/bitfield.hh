@@ -54,8 +54,6 @@ extern const uint8_t reverseLookUpTable[];
  * greater than 64 is given, it is truncated to 64.
  *
  * @param nbits The number of bits set in the mask.
- *
- * @ingroup api_bitfield
  */
 inline uint64_t
 mask(int nbits)
@@ -66,8 +64,6 @@ mask(int nbits)
 /**
  * Extract the bitfield from position 'first' to 'last' (inclusive)
  * from 'val' and right justify it.  MSB is numbered 63, LSB is 0.
- *
- * @ingroup api_bitfield
  */
 template <class T>
 inline
@@ -75,14 +71,11 @@ T
 bits(T val, int first, int last)
 {
     int nbits = first - last + 1;
-    assert((first - last) >= 0);
     return (val >> last) & mask(nbits);
 }
 
 /**
  * Extract the bit from this position from 'val' and right justify it.
- *
- * @ingroup api_bitfield
  */
 template <class T>
 inline
@@ -95,8 +88,6 @@ bits(T val, int bit)
 /**
  * Mask off the given bits in place like bits() but without shifting.
  * msb = 63, lsb = 0
- *
- * @ingroup api_bitfield
  */
 template <class T>
 inline
@@ -106,9 +97,6 @@ mbits(T val, int first, int last)
     return val & (mask(first+1) & ~mask(last));
 }
 
-/**
- * @ingroup api_bitfield
- */
 inline uint64_t
 mask(int first, int last)
 {
@@ -117,8 +105,6 @@ mask(int first, int last)
 
 /**
  * Sign-extend an N-bit value to 64 bits.
- *
- * @ingroup api_bitfield
  */
 template <int N>
 inline
@@ -138,8 +124,6 @@ sext(uint64_t val)
  * val:      0xFFFF
  * bit_val:  0x0000
  * returned: 0xFF0F
- *
- * @ingroup api_bitfield
  */
 template <class T, class B>
 inline
@@ -147,15 +131,12 @@ T
 insertBits(T val, int first, int last, B bit_val)
 {
     T t_bit_val = bit_val;
-    assert((first - last) >= 0);
     T bmask = mask(first - last + 1) << last;
     return ((t_bit_val << last) & bmask) | (val & ~bmask);
 }
 
 /**
  * Overloaded for access to only one bit in value
- *
- * @ingroup api_bitfield
  */
 template <class T, class B>
 inline
@@ -167,11 +148,7 @@ insertBits(T val, int bit, B bit_val)
 
 /**
  * A convenience function to replace bits first to last of val with bit_val
- * in place. It is functionally equivalent to insertBits.
- *
- * \note "first" is the MSB and "last" is the LSB. "first" >= "last"
- *
- * @ingroup api_bitfield
+ * in place.
  */
 template <class T, class B>
 inline
@@ -181,11 +158,7 @@ replaceBits(T& val, int first, int last, B bit_val)
     val = insertBits(val, first, last, bit_val);
 }
 
-/**
- * Overloaded function to allow to access only 1 bit
- *
- * @ingroup api_bitfield
- */
+/** Overloaded function to allow to access only 1 bit*/
 template <class T, class B>
 inline
 void
@@ -205,8 +178,6 @@ replaceBits(T& val, int bit, B bit_val)
  * @param val: variable lenght word
  * @param size: number of bytes to mirror
  * @return mirrored word
- *
- * @ingroup api_bitfield
  */
 template <class T>
 T
@@ -226,8 +197,6 @@ reverseBits(T val, std::size_t size = sizeof(T))
 
 /**
  * Returns the bit position of the MSB that is set in the input
- *
- * @ingroup api_bitfield
  */
 inline
 int
@@ -246,8 +215,6 @@ findMsbSet(uint64_t val) {
 
 /**
  * Returns the bit position of the LSB that is set in the input
- *
- * @ingroup api_bitfield
  */
 inline int
 findLsbSet(uint64_t val) {
@@ -265,8 +232,6 @@ findLsbSet(uint64_t val) {
 
 /**
  * Checks if a number is a power of two, or zero.
- *
- * @ingroup api_bitfield
  */
 template <class T>
 inline bool
@@ -278,8 +243,6 @@ isPow2(T v) {
  * Returns the number of set ones in the provided value.
  * PD algorithm from
  * http://graphics.stanford.edu/~seander/bithacks.html#CountBitsSetParallel
- *
- * @ingroup api_bitfield
  */
 inline int
 popCount(uint64_t val) {
@@ -310,8 +273,6 @@ popCount(uint64_t val) {
  *
  * This code has been modified from the following:
  * http://graphics.stanford.edu/~seander/bithacks.html#RoundUpPowerOf2
- *
- * @ingroup api_bitfield
  */
 inline uint64_t alignToPowerOfTwo(uint64_t val)
 {
@@ -332,8 +293,6 @@ inline uint64_t alignToPowerOfTwo(uint64_t val)
  *
  * @param An input value
  * @return The number of trailing zeros or 32 if the value is zero.
- *
- * @ingroup api_bitfield
  */
 inline int ctz32(uint32_t value)
 {
@@ -345,8 +304,6 @@ inline int ctz32(uint32_t value)
  *
  * @param An input value
  * @return The number of trailing zeros or 64 if the value is zero.
- *
- * @ingroup api_bitfield
  */
 inline int ctz64(uint64_t value)
 {

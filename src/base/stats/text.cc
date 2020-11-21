@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019-2020 Arm Limited
+ * Copyright (c) 2019 Arm Limited
  * All rights reserved.
  *
  * The license below extends only to copyright in the software and shall
@@ -95,16 +95,18 @@ namespace Stats {
 std::list<Info *> &statsList();
 
 Text::Text()
-    : mystream(false), stream(NULL), descriptions(false), spaces(false)
+    : mystream(false), stream(NULL), descriptions(false)
 {
 }
 
-Text::Text(std::ostream &stream) : Text()
+Text::Text(std::ostream &stream)
+    : mystream(false), stream(NULL), descriptions(false)
 {
     open(stream);
 }
 
-Text::Text(const std::string &file) : Text()
+Text::Text(const std::string &file)
+    : mystream(false), stream(NULL), descriptions(false)
 {
     open(file);
 }
@@ -227,28 +229,10 @@ struct ScalarPrint
     string desc;
     Flags flags;
     bool descriptions;
-    bool spaces;
     int precision;
     Result pdf;
     Result cdf;
-    int nameSpaces;
-    int valueSpaces;
-    int pdfstrSpaces;
-    int cdfstrSpaces;
 
-    ScalarPrint(bool spaces) : spaces(spaces) {
-        if (spaces) {
-            nameSpaces = 40;
-            valueSpaces = 12;
-            pdfstrSpaces = 10;
-            cdfstrSpaces = 10;
-        } else {
-            nameSpaces = 0;
-            valueSpaces = 0;
-            pdfstrSpaces = 0;
-            cdfstrSpaces = 0;
-        }
-    }
     void update(Result val, Result total);
     void operator()(ostream &stream, bool oneLine = false) const;
 };
@@ -279,16 +263,12 @@ ScalarPrint::operator()(ostream &stream, bool oneLine) const
         ccprintf(cdfstr, "%.2f%%", cdf * 100.0);
 
     if (oneLine) {
-        ccprintf(stream, " |");
+        ccprintf(stream, " |%12s %10s %10s",
+                 ValueToString(value, precision), pdfstr.str(), cdfstr.str());
     } else {
-        ccprintf(stream, "%-*s ", nameSpaces, name);
-    }
-    ccprintf(stream, "%*s", valueSpaces, ValueToString(value, precision));
-    if (spaces || pdfstr.rdbuf()->in_avail())
-        ccprintf(stream, " %*s", pdfstrSpaces, pdfstr.str());
-    if (spaces || cdfstr.rdbuf()->in_avail())
-        ccprintf(stream, " %*s", cdfstrSpaces, cdfstr.str());
-    if (!oneLine) {
+        ccprintf(stream, "%-40s %12s %10s %10s", name,
+                 ValueToString(value, precision), pdfstr.str(), cdfstr.str());
+
         if (descriptions) {
             if (!desc.empty())
                 ccprintf(stream, " # %s", desc);
@@ -306,21 +286,11 @@ struct VectorPrint
     vector<string> subdescs;
     Flags flags;
     bool descriptions;
-    bool spaces;
     int precision;
     VResult vec;
     Result total;
     bool forceSubnames;
-    int nameSpaces;
 
-    VectorPrint() = delete;
-    VectorPrint(bool spaces) : spaces(spaces) {
-        if (spaces) {
-            nameSpaces = 40;
-        } else {
-            nameSpaces = 0;
-        }
-    }
     void operator()(ostream &stream) const;
 };
 
@@ -338,7 +308,7 @@ VectorPrint::operator()(std::ostream &stream) const
 
     string base = name + separatorString;
 
-    ScalarPrint print(spaces);
+    ScalarPrint print;
     print.name = name;
     print.desc = desc;
     print.precision = precision;
@@ -362,7 +332,7 @@ VectorPrint::operator()(std::ostream &stream) const
 
     if ((!flags.isSet(nozero)) || (total != 0)) {
         if (flags.isSet(oneline)) {
-            ccprintf(stream, "%-*s", nameSpaces, name);
+            ccprintf(stream, "%-40s", name);
             print.flags = print.flags & (~nozero);
         }
 
@@ -403,9 +373,7 @@ struct DistPrint
     string desc;
     Flags flags;
     bool descriptions;
-    bool spaces;
     int precision;
-    int nameSpaces;
 
     const DistData &data;
 
@@ -421,8 +389,8 @@ DistPrint::DistPrint(const Text *text, const DistInfo &info)
     init(text, info);
 }
 
-DistPrint::DistPrint(const Text *text, const VectorDistInfo &info,
-    int i) : data(info.data[i])
+DistPrint::DistPrint(const Text *text, const VectorDistInfo &info, int i)
+    : data(info.data[i])
 {
     init(text, info);
 
@@ -443,12 +411,6 @@ DistPrint::init(const Text *text, const Info &info)
     flags = info.flags;
     precision = info.precision;
     descriptions = text->descriptions;
-    spaces = text->spaces;
-    if (spaces) {
-        nameSpaces = 40;
-    } else {
-        nameSpaces = 0;
-    }
 }
 
 void
@@ -457,7 +419,7 @@ DistPrint::operator()(ostream &stream) const
     if (flags.isSet(nozero) && data.samples == 0) return;
     string base = name + separatorString;
 
-    ScalarPrint print(spaces);
+    ScalarPrint print;
     print.precision = precision;
     print.flags = flags;
     print.descriptions = descriptions;
@@ -526,7 +488,7 @@ DistPrint::operator()(ostream &stream) const
     }
 
     if (flags.isSet(oneline)) {
-        ccprintf(stream, "%-*s", nameSpaces, name);
+        ccprintf(stream, "%-40s", name);
     }
 
     for (off_type i = 0; i < size; ++i) {
@@ -584,7 +546,7 @@ Text::visit(const ScalarInfo &info)
     if (noOutput(info))
         return;
 
-    ScalarPrint print(spaces);
+    ScalarPrint print;
     print.value = info.result();
     print.name = statName(info.name);
     print.desc = info.desc;
@@ -604,7 +566,7 @@ Text::visit(const VectorInfo &info)
         return;
 
     size_type size = info.size();
-    VectorPrint print(spaces);
+    VectorPrint print;
 
     print.name = statName(info.name);
     print.separatorString = info.separatorString;
@@ -644,7 +606,7 @@ Text::visit(const Vector2dInfo &info)
         return;
 
     bool havesub = false;
-    VectorPrint print(spaces);
+    VectorPrint print;
 
     if (!info.y_subnames.empty()) {
         for (off_type i = 0; i < info.y; ++i) {
@@ -743,7 +705,6 @@ struct SparseHistPrint
     string desc;
     Flags flags;
     bool descriptions;
-    bool spaces;
     int precision;
 
     const SparseHistData &data;
@@ -770,7 +731,6 @@ SparseHistPrint::init(const Text *text, const Info &info)
     flags = info.flags;
     precision = info.precision;
     descriptions = text->descriptions;
-    spaces = text->spaces;
 }
 
 /* Grab data from map and write to output stream */
@@ -779,7 +739,7 @@ SparseHistPrint::operator()(ostream &stream) const
 {
     string base = name + separatorString;
 
-    ScalarPrint print(spaces);
+    ScalarPrint print;
     print.precision = precision;
     print.flags = flags;
     print.descriptions = descriptions;
@@ -814,7 +774,7 @@ Text::visit(const SparseHistInfo &info)
 }
 
 Output *
-initText(const string &filename, bool desc, bool spaces)
+initText(const string &filename, bool desc)
 {
     static Text text;
     static bool connected = false;
@@ -822,7 +782,6 @@ initText(const string &filename, bool desc, bool spaces)
     if (!connected) {
         text.open(*simout.findOrCreate(filename)->stream());
         text.descriptions = desc;
-        text.spaces = spaces;
         connected = true;
     }
 

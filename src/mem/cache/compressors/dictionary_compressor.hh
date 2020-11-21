@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018-2020 Inria
+ * Copyright (c) 2018-2019 Inria
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -51,15 +51,12 @@
 #include <type_traits>
 #include <vector>
 
-#include "base/statistics.hh"
 #include "base/types.hh"
 #include "mem/cache/compressors/base.hh"
 
 struct BaseDictionaryCompressorParams;
 
-namespace Compressor {
-
-class BaseDictionaryCompressor : public Base
+class BaseDictionaryCompressor : public BaseCacheCompressor
 {
   protected:
     /** Dictionary size. */
@@ -68,18 +65,17 @@ class BaseDictionaryCompressor : public Base
     /** Number of valid entries in the dictionary. */
     std::size_t numEntries;
 
-    struct DictionaryStats : public Stats::Group
-    {
-        const BaseDictionaryCompressor& compressor;
+    /**
+     * @defgroup CompressionStats Compression specific statistics.
+     * @{
+     */
 
-        DictionaryStats(BaseStats &base_group,
-            BaseDictionaryCompressor& _compressor);
+    /** Number of data entries that were compressed to each pattern. */
+    Stats::Vector patternStats;
 
-        void regStats() override;
-
-        /** Number of data entries that were compressed to each pattern. */
-        Stats::Vector patterns;
-    } dictionaryStats;
+    /**
+     * @}
+     */
 
     /**
      * Trick function to get the number of patterns.
@@ -100,6 +96,8 @@ class BaseDictionaryCompressor : public Base
     typedef BaseDictionaryCompressorParams Params;
     BaseDictionaryCompressor(const Params *p);
     ~BaseDictionaryCompressor() = default;
+
+    void regStats() override;
 };
 
 /**
@@ -222,21 +220,13 @@ class DictionaryCompressor : public BaseDictionaryCompressor
     virtual void addToDictionary(const DictionaryEntry data) = 0;
 
     /**
-     * Instantiate a compression data of the sub-class compressor.
-     *
-     * @return The new compression data entry.
-     */
-    virtual std::unique_ptr<DictionaryCompressor::CompData>
-    instantiateDictionaryCompData() const;
-
-    /**
      * Apply compression.
      *
-     * @param chunks The cache line to be compressed.
+     * @param data The cache line to be compressed.
      * @return Cache line after compression.
      */
-    std::unique_ptr<Base::CompressionData> compress(
-        const std::vector<Chunk>& chunks);
+    std::unique_ptr<BaseCacheCompressor::CompressionData> compress(
+        const uint64_t* data);
 
     using BaseDictionaryCompressor::compress;
 
@@ -473,7 +463,7 @@ class DictionaryCompressor<T>::MaskedPattern
         const DictionaryEntry bytes,
         const bool allocate = true)
       : DictionaryCompressor<T>::Pattern(number, code, metadata_length,
-            popCount(static_cast<T>(~mask)), match_location, allocate),
+            popCount(~mask), match_location, allocate),
         bits(DictionaryCompressor<T>::fromDictionaryEntry(bytes) & ~mask)
     {
     }
@@ -572,10 +562,9 @@ class DictionaryCompressor<T>::LocatedMaskedPattern
         const uint64_t code,
         const uint64_t metadata_length,
         const int match_location,
-        const DictionaryEntry bytes,
-        const bool allocate = true)
+        const DictionaryEntry bytes)
       : MaskedPattern<mask>(number, code, metadata_length, match_location,
-            bytes, allocate)
+            bytes)
     {
     }
 
@@ -735,7 +724,5 @@ class DictionaryCompressor<T>::DeltaPattern
         return bytes;
     }
 };
-
-} // namespace Compressor
 
 #endif //__MEM_CACHE_COMPRESSORS_DICTIONARY_COMPRESSOR_HH__

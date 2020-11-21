@@ -33,8 +33,8 @@
 
 #include "gpu-compute/pool_manager.hh"
 
-PoolManager::PoolManager(const PoolManagerParams *p)
-    : SimObject(p), _minAllocation(p->min_alloc), _poolSize(p->pool_size)
+PoolManager::PoolManager(uint32_t minAlloc, uint32_t poolSize)
+    : _minAllocation(minAlloc), _poolSize(poolSize)
 {
-    assert(_poolSize > 0);
+    assert(poolSize > 0);
 }

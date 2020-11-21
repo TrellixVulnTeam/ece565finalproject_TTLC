@@ -32,7 +32,6 @@
 #include <memory>
 
 #include "params/MRURP.hh"
-#include "sim/core.hh"
 
 MRURP::MRURP(const Params *p)
     : BaseReplacementPolicy(p)

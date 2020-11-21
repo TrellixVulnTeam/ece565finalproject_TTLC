@@ -81,14 +81,15 @@ FsFreebsd::initState()
     // to do this permanently, for but early bootup work
     // it is helpful.
     if (params()->early_kernel_symbols) {
-        auto phys_globals = kernelObj->symtab().globals()->mask(_loadAddrMask);
-        kernelSymtab.insert(*phys_globals);
-        Loader::debugSymbolTable.insert(*phys_globals);
+        kernelObj->loadGlobalSymbols(kernelSymtab, 0, 0, _loadAddrMask);
+        kernelObj->loadGlobalSymbols(
+                Loader::debugSymbolTable, 0, 0, _loadAddrMask);
     }
 
     // Check if the kernel image has a symbol that tells us it supports
     // device trees.
-    fatal_if(kernelSymtab.find("fdt_get_range") == kernelSymtab.end(),
+    Addr addr;
+    fatal_if(!kernelSymtab->findAddress("fdt_get_range", addr),
              "Kernel must have fdt support.");
     fatal_if(params()->dtb_filename == "", "dtb file is not specified.");
 
@@ -113,7 +114,7 @@ FsFreebsd::initState()
     delete dtb_file;
 
     // Kernel boot requirements to set up r0, r1 and r2 in ARMv7
-    for (auto *tc: system->threads) {
+    for (auto tc: system->threadContexts) {
         tc->setIntReg(0, 0);
         tc->setIntReg(1, params()->machine_type);
         tc->setIntReg(2, params()->atags_addr + _loadAddrOffset);

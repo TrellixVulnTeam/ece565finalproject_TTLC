@@ -206,8 +206,7 @@ def template QuiescePredOpExecute {{
             }
         } else {
             xc->setPredicate(false);
-            ThreadContext *tc = xc->tcBase();
-            tc->quiesceTick(tc->getCpuPtr()->nextCycle() + 1);
+            PseudoInst::quiesceSkip(xc->tcBase());
         }
 
         return fault;
@@ -234,8 +233,7 @@ def template QuiescePredOpExecuteWithFixup {{
         } else {
             xc->setPredicate(false);
             %(pred_fixup)s;
-            ThreadContext *tc = xc->tcBase();
-            tc->quiesceTick(tc->getCpuPtr()->nextCycle() + 1);
+            PseudoInst::quiesceSkip(xc->tcBase());
         }
 
         return fault;

@@ -72,6 +72,7 @@ class MemTest : public ClockedObject
     typedef MemTestParams Params;
     MemTest(const Params *p);
 
+    void regStats() override;
 
     Port &getPort(const std::string &if_name,
                   PortID idx=InvalidPortID) override;
@@ -90,14 +91,14 @@ class MemTest : public ClockedObject
 
     EventFunctionWrapper noResponseEvent;
 
-    class CpuPort : public RequestPort
+    class CpuPort : public MasterPort
     {
         MemTest &memtest;
 
       public:
 
         CpuPort(const std::string &_name, MemTest &_memtest)
-            : RequestPort(_name, &_memtest), memtest(_memtest)
+            : MasterPort(_name, &_memtest), memtest(_memtest)
         { }
 
       protected:
@@ -126,7 +127,7 @@ class MemTest : public ClockedObject
     const unsigned percentUncacheable;
 
     /** Request id for all generated traffic */
-    RequestorID requestorId;
+    MasterID masterId;
 
     unsigned int id;
 
@@ -165,13 +166,9 @@ class MemTest : public ClockedObject
     const bool atomic;
 
     const bool suppressFuncErrors;
-  protected:
-    struct MemTestStats : public Stats::Group
-    {
-        MemTestStats(Stats::Group *parent);
-        Stats::Scalar numReads;
-        Stats::Scalar numWrites;
-    } stats;
+
+    Stats::Scalar numReadsStat;
+    Stats::Scalar numWritesStat;
 
     /**
      * Complete a request by checking the response.

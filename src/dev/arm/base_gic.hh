@@ -173,7 +173,7 @@ class ArmPPIGen : public ArmInterruptPinGen
 /**
  * Generic representation of an Arm interrupt pin.
  */
-class ArmInterruptPin : public Serializable
+class ArmInterruptPin
 {
     friend class ArmInterruptPinGen;
   protected:
@@ -193,17 +193,10 @@ class ArmInterruptPin : public Serializable
     /** Get interrupt number */
     uint32_t num() const { return intNum; }
 
-    /** True if interrupt pin is active, false otherwise */
-    bool active() const { return _active; }
-
     /** Signal an interrupt */
     virtual void raise() = 0;
     /** Clear a signalled interrupt */
     virtual void clear() = 0;
-
-  public: /* Serializable interface */
-    void serialize(CheckpointOut &cp) const override;
-    void unserialize(CheckpointIn &cp) override;
 
   protected:
     /**
@@ -225,9 +218,6 @@ class ArmInterruptPin : public Serializable
 
     /** Interrupt number to generate */
     const uint32_t intNum;
-
-    /** True if interrupt pin is active, false otherwise */
-    bool _active;
 };
 
 class ArmSPI : public ArmInterruptPin

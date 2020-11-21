@@ -392,15 +392,14 @@ machine(MachineType:TCC, "TCC Cache")
 
   action(w_sendResponseWBAck, "w", desc="send WB Ack") {
     peek(responseFromNB_in, ResponseMsg) {
-      enqueue(responseToCore_out, ResponseMsg, l2_response_latency) {
-        out_msg.addr := address;
-        out_msg.Type := CoherenceResponseType:TDSysWBAck;
-        out_msg.Destination.clear();
-        out_msg.Destination.add(in_msg.WTRequestor);
-        out_msg.Sender := machineID;
-        out_msg.MessageSize := MessageSizeType:Writeback_Control;
-        out_msg.instSeqNum := in_msg.instSeqNum;
-      }
+        enqueue(responseToCore_out, ResponseMsg, l2_response_latency) {
+          out_msg.addr := address;
+          out_msg.Type := CoherenceResponseType:TDSysWBAck;
+          out_msg.Destination.clear();
+          out_msg.Destination.add(in_msg.WTRequestor);
+          out_msg.Sender := machineID;
+          out_msg.MessageSize := MessageSizeType:Writeback_Control;
+        }
     }
   }
 
@@ -413,7 +412,6 @@ machine(MachineType:TCC, "TCC Cache")
         out_msg.Destination.add(in_msg.Requestor);
         out_msg.Sender := machineID;
         out_msg.MessageSize := MessageSizeType:Writeback_Control;
-        out_msg.instSeqNum := in_msg.instSeqNum;
       }
     }
   }
@@ -436,14 +434,6 @@ machine(MachineType:TCC, "TCC Cache")
       set_cache_entry(L2cache.allocate(address, new Entry));
       cache_entry.writeMask.clear();
     }
-  }
-
-  action(p_profileMiss, "pm", desc="Profile cache miss") {
-      ++L2cache.demand_misses;
-  }
-
-  action(p_profileHit, "ph", desc="Profile cache hit") {
-      ++L2cache.demand_hits;
   }
 
   action(t_allocateTBE, "t", desc="allocate TBE Entry") {
@@ -496,7 +486,6 @@ machine(MachineType:TCC, "TCC Cache")
         out_msg.Dirty := true;
         out_msg.DataBlk := in_msg.DataBlk;
         out_msg.writeMask.orMask(in_msg.writeMask);
-        out_msg.instSeqNum := in_msg.instSeqNum;
       }
     }
   }
@@ -604,42 +593,28 @@ machine(MachineType:TCC, "TCC Cache")
       z_stall;
   }
   transition({M, V}, RdBlk) {TagArrayRead, DataArrayRead} {
-    p_profileHit;
     sd_sendData;
     ut_updateTag;
     p_popRequestQueue;
   }
   transition(W, RdBlk, WI) {TagArrayRead, DataArrayRead} {
-    p_profileHit;
     t_allocateTBE;
     wb_writeBack;
   }
 
   transition(I, RdBlk, IV) {TagArrayRead} {
-    p_profileMiss;
     t_allocateTBE;
     rd_requestData;
     p_popRequestQueue;
   }
 
   transition(IV, RdBlk) {
-    p_profileMiss;
     t_allocateTBE;
     rd_requestData;
     p_popRequestQueue;
   }
 
-  transition(V, Atomic, A) {TagArrayRead} {
-    p_profileHit;
-    i_invL2;
-    t_allocateTBE;
-    at_atomicThrough;
-    ina_incrementNumAtomics;
-    p_popRequestQueue;
-  }
-
-transition(I, Atomic, A) {TagArrayRead} {
-    p_profileMiss;
+  transition({V, I},Atomic, A) {TagArrayRead} {
     i_invL2;
     t_allocateTBE;
     at_atomicThrough;
@@ -648,26 +623,22 @@ transition(I, Atomic, A) {TagArrayRead} {
   }
 
   transition(A, Atomic) {
-    p_profileMiss;
     at_atomicThrough;
     ina_incrementNumAtomics;
     p_popRequestQueue;
   }
 
   transition({M, W}, Atomic, WI) {TagArrayRead} {
-    p_profileHit;
     t_allocateTBE;
     wb_writeBack;
   }
 
   transition(I, WrVicBlk) {TagArrayRead} {
-    p_profileMiss;
     wt_writeThrough;
     p_popRequestQueue;
   }
 
   transition(V, WrVicBlk) {TagArrayRead, DataArrayWrite} {
-    p_profileHit;
     ut_updateTag;
     wdb_writeDirtyBytes;
     wt_writeThrough;
@@ -675,7 +646,6 @@ transition(I, Atomic, A) {TagArrayRead} {
   }
 
   transition({V, M}, WrVicBlkBack, M) {TagArrayRead, TagArrayWrite, DataArrayWrite} {
-    p_profileHit;
     ut_updateTag;
     swb_sendWBAck;
     wdb_writeDirtyBytes;
@@ -683,7 +653,6 @@ transition(I, Atomic, A) {TagArrayRead} {
   }
 
   transition(W, WrVicBlkBack) {TagArrayRead, TagArrayWrite, DataArrayWrite} {
-    p_profileHit;
     ut_updateTag;
     swb_sendWBAck;
     wdb_writeDirtyBytes;
@@ -691,7 +660,6 @@ transition(I, Atomic, A) {TagArrayRead} {
   }
 
   transition(I, WrVicBlkBack, W) {TagArrayRead, TagArrayWrite, DataArrayWrite} {
-    p_profileMiss;
     a_allocateBlock;
     ut_updateTag;
     swb_sendWBAck;

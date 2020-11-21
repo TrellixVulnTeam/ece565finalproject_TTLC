@@ -63,8 +63,7 @@ TAGEBase::TAGEBase(const TAGEBaseParams *p)
      noSkip(p->noSkip),
      speculativeHistUpdate(p->speculativeHistUpdate),
      instShiftAmt(p->instShiftAmt),
-     initialized(false),
-     stats(this, nHistoryTables)
+     initialized(false)
 {
     if (noSkip.empty()) {
         // Set all the table to enabled by default
@@ -83,7 +82,6 @@ TAGEBase::init()
     if (initialized) {
        return;
     }
-
     // Current method for periodically resetting the u counter bits only
     // works for 1 or 2 bits
     // Also make sure that it is not 0
@@ -658,28 +656,26 @@ TAGEBase::updateStats(bool taken, BranchInfo* bi)
     if (taken == bi->tagePred) {
         // correct prediction
         switch (bi->provider) {
-          case BIMODAL_ONLY: stats.bimodalProviderCorrect++; break;
-          case TAGE_LONGEST_MATCH: stats.longestMatchProviderCorrect++; break;
-          case BIMODAL_ALT_MATCH:
-            stats.bimodalAltMatchProviderCorrect++;
-            break;
-          case TAGE_ALT_MATCH: stats.altMatchProviderCorrect++; break;
+          case BIMODAL_ONLY: tageBimodalProviderCorrect++; break;
+          case TAGE_LONGEST_MATCH: tageLongestMatchProviderCorrect++; break;
+          case BIMODAL_ALT_MATCH: bimodalAltMatchProviderCorrect++; break;
+          case TAGE_ALT_MATCH: tageAltMatchProviderCorrect++; break;
         }
     } else {
         // wrong prediction
         switch (bi->provider) {
-          case BIMODAL_ONLY: stats.bimodalProviderWrong++; break;
+          case BIMODAL_ONLY: tageBimodalProviderWrong++; break;
           case TAGE_LONGEST_MATCH:
-            stats.longestMatchProviderWrong++;
+            tageLongestMatchProviderWrong++;
             if (bi->altTaken == taken) {
-                stats.altMatchProviderWouldHaveHit++;
+                tageAltMatchProviderWouldHaveHit++;
             }
             break;
           case BIMODAL_ALT_MATCH:
-            stats.bimodalAltMatchProviderWrong++;
+            bimodalAltMatchProviderWrong++;
             break;
           case TAGE_ALT_MATCH:
-            stats.altMatchProviderWrong++;
+            tageAltMatchProviderWrong++;
             break;
         }
 
@@ -687,7 +683,7 @@ TAGEBase::updateStats(bool taken, BranchInfo* bi)
           case BIMODAL_ALT_MATCH:
           case TAGE_ALT_MATCH:
             if (bi->longestMatchPred == taken) {
-                stats.longestMatchProviderWouldHaveHit++;
+                tageLongestMatchProviderWouldHaveHit++;
             }
         }
     }
@@ -695,8 +691,8 @@ TAGEBase::updateStats(bool taken, BranchInfo* bi)
     switch (bi->provider) {
       case TAGE_LONGEST_MATCH:
       case TAGE_ALT_MATCH:
-        stats.longestMatchProvider[bi->hitBank]++;
-        stats.altMatchProvider[bi->altBank]++;
+        tageLongestMatchProvider[bi->hitBank]++;
+        tageAltMatchProvider[bi->altBank]++;
         break;
     }
 }
@@ -716,38 +712,68 @@ TAGEBase::getGHR(ThreadID tid, BranchInfo *bi) const
     return val;
 }
 
-TAGEBase::TAGEBaseStats::TAGEBaseStats(
-    Stats::Group *parent, unsigned nHistoryTables)
-    : Stats::Group(parent),
-      ADD_STAT(longestMatchProviderCorrect, "Number of times TAGE Longest"
-          " Match is the provider and the prediction is correct"),
-      ADD_STAT(altMatchProviderCorrect, "Number of times TAGE Alt Match"
-          " is the provider and the prediction is correct"),
-      ADD_STAT(bimodalAltMatchProviderCorrect, "Number of times TAGE Alt"
-          " Match is the bimodal and it is the provider and the prediction"
-          " is correct"),
-      ADD_STAT(bimodalProviderCorrect, "Number of times there are no"
-          " hits on the TAGE tables and the bimodal prediction is correct"),
-      ADD_STAT(longestMatchProviderWrong, "Number of times TAGE Longest"
-          " Match is the provider and the prediction is wrong"),
-      ADD_STAT(altMatchProviderWrong, "Number of times TAGE Alt Match is"
-          " the provider and the prediction is wrong"),
-      ADD_STAT(bimodalAltMatchProviderWrong, "Number of times TAGE Alt Match"
-          " is the bimodal and it is the provider and the prediction is"
-          " wrong"),
-      ADD_STAT(bimodalProviderWrong, "Number of times there are no hits"
-          " on the TAGE tables and the bimodal prediction is wrong"),
-      ADD_STAT(altMatchProviderWouldHaveHit, "Number of times TAGE"
-          " Longest Match is the provider, the prediction is wrong and"
-          " Alt Match prediction was correct"),
-      ADD_STAT(longestMatchProviderWouldHaveHit, "Number of times"
-          " TAGE Alt Match is the provider, the prediction is wrong and"
-          " Longest Match prediction was correct"),
-      ADD_STAT(longestMatchProvider, "TAGE provider for longest match"),
-      ADD_STAT(altMatchProvider, "TAGE provider for alt match")
+void
+TAGEBase::regStats()
 {
-    longestMatchProvider.init(nHistoryTables + 1);
-    altMatchProvider.init(nHistoryTables + 1);
+    tageLongestMatchProviderCorrect
+        .name(name() + ".tageLongestMatchProviderCorrect")
+        .desc("Number of times TAGE Longest Match is the provider and "
+              "the prediction is correct");
+
+    tageAltMatchProviderCorrect
+        .name(name() + ".tageAltMatchProviderCorrect")
+        .desc("Number of times TAGE Alt Match is the provider and "
+              "the prediction is correct");
+
+    bimodalAltMatchProviderCorrect
+        .name(name() + ".bimodalAltMatchProviderCorrect")
+        .desc("Number of times TAGE Alt Match is the bimodal and it is the "
+              "provider and the prediction is correct");
+
+    tageBimodalProviderCorrect
+        .name(name() + ".tageBimodalProviderCorrect")
+        .desc("Number of times there are no hits on the TAGE tables "
+              "and the bimodal prediction is correct");
+
+    tageLongestMatchProviderWrong
+        .name(name() + ".tageLongestMatchProviderWrong")
+        .desc("Number of times TAGE Longest Match is the provider and "
+              "the prediction is wrong");
+
+    tageAltMatchProviderWrong
+        .name(name() + ".tageAltMatchProviderWrong")
+        .desc("Number of times TAGE Alt Match is the provider and "
+              "the prediction is wrong");
+
+    bimodalAltMatchProviderWrong
+        .name(name() + ".bimodalAltMatchProviderWrong")
+        .desc("Number of times TAGE Alt Match is the bimodal and it is the "
+              "provider and the prediction is wrong");
+
+    tageBimodalProviderWrong
+        .name(name() + ".tageBimodalProviderWrong")
+        .desc("Number of times there are no hits on the TAGE tables "
+              "and the bimodal prediction is wrong");
+
+    tageAltMatchProviderWouldHaveHit
+        .name(name() + ".tageAltMatchProviderWouldHaveHit")
+        .desc("Number of times TAGE Longest Match is the provider, "
+              "the prediction is wrong and Alt Match prediction was correct");
+
+    tageLongestMatchProviderWouldHaveHit
+        .name(name() + ".tageLongestMatchProviderWouldHaveHit")
+        .desc("Number of times TAGE Alt Match is the provider, the "
+              "prediction is wrong and Longest Match prediction was correct");
+
+    tageLongestMatchProvider
+        .init(nHistoryTables + 1)
+        .name(name() + ".tageLongestMatchProvider")
+        .desc("TAGE provider for longest match");
+
+    tageAltMatchProvider
+        .init(nHistoryTables + 1)
+        .name(name() + ".tageAltMatchProvider")
+        .desc("TAGE provider for alt match");
 }
 
 int8_t

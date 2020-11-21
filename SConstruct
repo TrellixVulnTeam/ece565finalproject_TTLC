@@ -99,34 +99,75 @@ import SCons.Node.FS
 
 from m5.util import compareVersions, readCommand, readCommandWithReturn
 
-AddOption('--colors', dest='use_colors', action='store_true',
-          help="Add color to abbreviated scons output")
-AddOption('--no-colors', dest='use_colors', action='store_false',
-          help="Don't add color to abbreviated scons output")
-AddOption('--with-cxx-config', action='store_true',
-          help="Build with support for C++-based configuration")
-AddOption('--default',
-          help='Override which build_opts file to use for defaults')
-AddOption('--ignore-style', action='store_true',
-          help='Disable style checking hooks')
-AddOption('--gold-linker', action='store_true', help='Use the gold linker')
-AddOption('--no-lto', action='store_true',
-          help='Disable Link-Time Optimization for fast')
-AddOption('--force-lto', action='store_true',
-          help='Use Link-Time Optimization instead of partial linking' +
-               ' when the compiler doesn\'t support using them together.')
-AddOption('--verbose', action='store_true',
-          help='Print full tool command lines')
-AddOption('--without-python', action='store_true',
-          help='Build without Python configuration support')
-AddOption('--without-tcmalloc', action='store_true',
-          help='Disable linking against tcmalloc')
-AddOption('--with-ubsan', action='store_true',
-          help='Build with Undefined Behavior Sanitizer if available')
-AddOption('--with-asan', action='store_true',
-          help='Build with Address Sanitizer if available')
-AddOption('--with-systemc-tests', action='store_true',
-          help='Build systemc tests')
+help_texts = {
+    "options" : "",
+    "global_vars" : "",
+    "local_vars" : ""
+}
+
+Export("help_texts")
+
+
+# There's a bug in scons in that (1) by default, the help texts from
+# AddOption() are supposed to be displayed when you type 'scons -h'
+# and (2) you can override the help displayed by 'scons -h' using the
+# Help() function, but these two features are incompatible: once
+# you've overridden the help text using Help(), there's no way to get
+# at the help texts from AddOptions.  See:
+#     http://scons.tigris.org/issues/show_bug.cgi?id=2356
+#     http://scons.tigris.org/issues/show_bug.cgi?id=2611
+# This hack lets us extract the help text from AddOptions and
+# re-inject it via Help().  Ideally someday this bug will be fixed and
+# we can just use AddOption directly.
+def AddLocalOption(*args, **kwargs):
+    col_width = 30
+
+    help = "  " + ", ".join(args)
+    if "help" in kwargs:
+        length = len(help)
+        if length >= col_width:
+            help += "\n" + " " * col_width
+        else:
+            help += " " * (col_width - length)
+        help += kwargs["help"]
+    help_texts["options"] += help + "\n"
+
+    AddOption(*args, **kwargs)
+
+AddLocalOption('--colors', dest='use_colors', action='store_true',
+               help="Add color to abbreviated scons output")
+AddLocalOption('--no-colors', dest='use_colors', action='store_false',
+               help="Don't add color to abbreviated scons output")
+AddLocalOption('--with-cxx-config', dest='with_cxx_config',
+               action='store_true',
+               help="Build with support for C++-based configuration")
+AddLocalOption('--default', dest='default', type='string', action='store',
+               help='Override which build_opts file to use for defaults')
+AddLocalOption('--ignore-style', dest='ignore_style', action='store_true',
+               help='Disable style checking hooks')
+AddLocalOption('--gold-linker', dest='gold_linker', action='store_true',
+               help='Use the gold linker')
+AddLocalOption('--no-lto', dest='no_lto', action='store_true',
+               help='Disable Link-Time Optimization for fast')
+AddLocalOption('--force-lto', dest='force_lto', action='store_true',
+               help='Use Link-Time Optimization instead of partial linking' +
+                    ' when the compiler doesn\'t support using them together.')
+AddLocalOption('--update-ref', dest='update_ref', action='store_true',
+               help='Update test reference outputs')
+AddLocalOption('--verbose', dest='verbose', action='store_true',
+               help='Print full tool command lines')
+AddLocalOption('--without-python', dest='without_python',
+               action='store_true',
+               help='Build without Python configuration support')
+AddLocalOption('--without-tcmalloc', dest='without_tcmalloc',
+               action='store_true',
+               help='Disable linking against tcmalloc')
+AddLocalOption('--with-ubsan', dest='with_ubsan', action='store_true',
+               help='Build with Undefined Behavior Sanitizer if available')
+AddLocalOption('--with-asan', dest='with_asan', action='store_true',
+               help='Build with Address Sanitizer if available')
+AddLocalOption('--with-systemc-tests', dest='with_systemc_tests',
+               action='store_true', help='Build systemc tests')
 
 from gem5_scons import Transform, error, warning, summarize_warnings
 
@@ -235,8 +276,6 @@ global_vars.AddVariables(
     ('CXX', 'C++ compiler', environ.get('CXX', main['CXX'])),
     ('CCFLAGS_EXTRA', 'Extra C and C++ compiler flags', ''),
     ('LDFLAGS_EXTRA', 'Extra linker flags', ''),
-    ('MARSHAL_CCFLAGS_EXTRA', 'Extra C and C++ marshal compiler flags', ''),
-    ('MARSHAL_LDFLAGS_EXTRA', 'Extra marshal linker flags', ''),
     ('PYTHON_CONFIG', 'Python config binary to use',
      [ 'python2.7-config', 'python-config', 'python3-config' ]),
     ('PROTOC', 'protoc tool', environ.get('PROTOC', 'protoc')),
@@ -248,10 +287,7 @@ global_vars.AddVariables(
 
 # Update main environment with values from ARGUMENTS & global_vars_file
 global_vars.Update(main)
-Help('''
-Global build variables:
-{help}
-'''.format(help=global_vars.GenerateHelpText(main)), append=True)
+help_texts["global_vars"] += global_vars.GenerateHelpText(main)
 
 # Save sticky variable settings back to current variables file
 global_vars.Save(global_vars_file, main)
@@ -317,8 +353,8 @@ if main['GCC'] or main['CLANG']:
     # we consistently violate
     main.Append(CCFLAGS=['-Wall', '-Wundef', '-Wextra',
                          '-Wno-sign-compare', '-Wno-unused-parameter'])
-    # We always compile using C++14
-    main.Append(CXXFLAGS=['-std=c++14'])
+    # We always compile using C++11
+    main.Append(CXXFLAGS=['-std=c++11'])
     if sys.platform.startswith('freebsd'):
         main.Append(CCFLAGS=['-I/usr/local/include'])
         main.Append(CXXFLAGS=['-I/usr/local/include'])
@@ -357,21 +393,24 @@ else:
           "src/SConscript to support that compiler.")))
 
 if main['GCC']:
+    # Check for a supported version of gcc. >= 4.8 is chosen for its
+    # level of c++11 support. See
+    # http://gcc.gnu.org/projects/cxx0x.html for details.
     gcc_version = readCommand([main['CXX'], '-dumpversion'], exception=False)
-    if compareVersions(gcc_version, "5") < 0:
-        error('gcc version 5 or newer required.\n'
+    if compareVersions(gcc_version, "4.8") < 0:
+        error('gcc version 4.8 or newer required.\n'
               'Installed version:', gcc_version)
         Exit(1)
 
     main['GCC_VERSION'] = gcc_version
 
-    # Incremental linking with LTO is currently broken in gcc versions
-    # 4.9 and above. A version where everything works completely hasn't
-    # yet been identified.
-    #
-    # https://gcc.gnu.org/bugzilla/show_bug.cgi?id=67548
-    main['BROKEN_INCREMENTAL_LTO'] = True
-
+    if compareVersions(gcc_version, '4.9') >= 0:
+        # Incremental linking with LTO is currently broken in gcc versions
+        # 4.9 and above. A version where everything works completely hasn't
+        # yet been identified.
+        #
+        # https://gcc.gnu.org/bugzilla/show_bug.cgi?id=67548
+        main['BROKEN_INCREMENTAL_LTO'] = True
     if compareVersions(gcc_version, '6.0') >= 0:
         # gcc versions 6.0 and greater accept an -flinker-output flag which
         # selects what type of output the linker should generate. This is
@@ -413,12 +452,15 @@ if main['GCC']:
                                   '-fno-builtin-realloc', '-fno-builtin-free'])
 
 elif main['CLANG']:
+    # Check for a supported version of clang, >= 3.1 is needed to
+    # support similar features as gcc 4.8. See
+    # http://clang.llvm.org/cxx_status.html for details
     clang_version_re = re.compile(".* version (\d+\.\d+)")
     clang_version_match = clang_version_re.search(CXX_version)
     if (clang_version_match):
         clang_version = clang_version_match.groups()[0]
-        if compareVersions(clang_version, "3.9") < 0:
-            error('clang version 3.9 or newer required.\n'
+        if compareVersions(clang_version, "3.1") < 0:
+            error('clang version 3.1 or newer required.\n'
                   'Installed version:', clang_version)
     else:
         error('Unable to determine clang version.')
@@ -434,8 +476,7 @@ elif main['CLANG']:
                          # interchangeably.
                          '-Wno-mismatched-tags',
                          ])
-    if sys.platform != "darwin" and \
-       compareVersions(clang_version, "10.0") >= 0:
+    if compareVersions(clang_version, "10.0") >= 0:
         main.Append(CCFLAGS=['-Wno-c99-designator'])
 
     if compareVersions(clang_version, "8.0") >= 0:
@@ -456,9 +497,13 @@ elif main['CLANG']:
 # Add sanitizers flags
 sanitizers=[]
 if GetOption('with_ubsan'):
-    sanitizers.append('undefined')
+    # Only gcc >= 4.9 supports UBSan, so check both the version
+    # and the command-line option before adding the compiler and
+    # linker flags.
+    if not main['GCC'] or compareVersions(main['GCC_VERSION'], '4.9') >= 0:
+        sanitizers.append('undefined')
 if GetOption('with_asan'):
-    # Available for gcc >= 5 or llvm >= 3.1 both a requirement
+    # Available for gcc >= 4.8 or llvm >= 3.1 both a requirement
     # by the build system
     sanitizers.append('address')
     suppressions_file = Dir('util').File('lsan-suppressions').get_abspath()
@@ -689,9 +734,7 @@ if main['USE_PYTHON']:
 
 main.Prepend(CPPPATH=Dir('ext/pybind11/include/'))
 # Bare minimum environment that only includes python
-marshal_env = main.Clone()
-marshal_env.Append(CCFLAGS='$MARSHAL_CCFLAGS_EXTRA')
-marshal_env.Append(LINKFLAGS='$MARSHAL_LDFLAGS_EXTRA')
+base_py_env = main.Clone()
 
 # On Solaris you need to use libsocket for socket ops
 if not conf.CheckLibWithHeader(None, 'sys/socket.h', 'C++', 'accept(0,0,0);'):
@@ -945,8 +988,8 @@ all_isa_list.sort()
 all_gpu_isa_list.sort()
 
 sticky_vars.AddVariables(
-    EnumVariable('TARGET_ISA', 'Target ISA', 'null', all_isa_list),
-    EnumVariable('TARGET_GPU_ISA', 'Target GPU ISA', 'gcn3', all_gpu_isa_list),
+    EnumVariable('TARGET_ISA', 'Target ISA', 'alpha', all_isa_list),
+    EnumVariable('TARGET_GPU_ISA', 'Target GPU ISA', 'hsail', all_gpu_isa_list),
     ListVariable('CPU_MODELS', 'CPU models',
                  sorted(n for n,m in CpuModel.dict.items() if m.default),
                  sorted(CpuModel.dict.keys())),
@@ -958,6 +1001,8 @@ sticky_vars.AddVariables(
     BoolVariable('USE_POSIX_CLOCK', 'Use POSIX Clocks', have_posix_clock),
     BoolVariable('USE_FENV', 'Use <fenv.h> IEEE mode control', have_fenv),
     BoolVariable('USE_PNG',  'Enable support for PNG images', have_png),
+    BoolVariable('CP_ANNOTATE', 'Enable critical path annotation capability',
+                 False),
     BoolVariable('USE_KVM', 'Enable hardware virtualized (KVM) CPU models',
                  have_kvm),
     BoolVariable('USE_TUNTAP',
@@ -974,7 +1019,7 @@ sticky_vars.AddVariables(
     )
 
 # These variables get exported to #defines in config/*.hh (see src/SConscript).
-export_vars += ['USE_FENV', 'TARGET_ISA', 'TARGET_GPU_ISA',
+export_vars += ['USE_FENV', 'TARGET_ISA', 'TARGET_GPU_ISA', 'CP_ANNOTATE',
                 'USE_POSIX_CLOCK', 'USE_KVM', 'USE_TUNTAP', 'PROTOCOL',
                 'HAVE_PROTOBUF', 'HAVE_VALGRIND',
                 'HAVE_PERF_ATTR_EXCLUDE_HOST', 'USE_PNG',
@@ -1178,11 +1223,9 @@ for variant_path in variant_paths:
     # Apply current variable settings to env
     sticky_vars.Update(env)
 
-    Help('''
-Build variables for {dir}:
-{help}
-'''.format(dir=variant_dir, help=sticky_vars.GenerateHelpText(env)),
-         append=True)
+    help_texts["local_vars"] += \
+        "Build variables for %s:\n" % variant_dir \
+                 + sticky_vars.GenerateHelpText(env)
 
     # Process variable settings.
 
@@ -1242,6 +1285,19 @@ Build variables for {dir}:
     # to the configured variables.  It returns a list of environments,
     # one for each variant build (debug, opt, etc.)
     SConscript('src/SConscript', variant_dir=variant_path,
-               exports=['env', 'marshal_env'])
+               exports=['env', 'base_py_env'])
+
+# base help text
+Help('''
+Usage: scons [scons options] [build variables] [target(s)]
+
+Extra scons options:
+%(options)s
+
+Global build variables:
+%(global_vars)s
+
+%(local_vars)s
+''' % help_texts)
 
 atexit.register(summarize_warnings)

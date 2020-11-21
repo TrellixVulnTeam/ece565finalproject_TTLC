@@ -62,13 +62,8 @@ class AddrRangeMap
     typedef std::map<AddrRange, V> RangeMap;
 
   public:
-    /**
-     * @ingroup api_addr_range
-     * @{
-     */
     typedef typename RangeMap::iterator iterator;
     typedef typename RangeMap::const_iterator const_iterator;
-    /** @} */ // end of api_addr_range
 
     /**
      * Find entry that contains the given address range
@@ -79,9 +74,6 @@ class AddrRangeMap
      *
      * @param r An input address range
      * @return An iterator that contains the input address range
-     *
-     * @ingroup api_addr_range
-     * @{
      */
     const_iterator
     contains(const AddrRange &r) const
@@ -93,7 +85,6 @@ class AddrRangeMap
     {
         return find(r, [r](const AddrRange r1) { return r.isSubset(r1); });
     }
-    /** @} */ // end of api_addr_range
 
     /**
      * Find entry that contains the given address
@@ -104,9 +95,6 @@ class AddrRangeMap
      *
      * @param r An input address
      * @return An iterator that contains the input address
-     *
-     * @ingroup api_addr_range
-     * @{
      */
     const_iterator
     contains(Addr r) const
@@ -118,7 +106,6 @@ class AddrRangeMap
     {
         return contains(RangeSize(r, 1));
     }
-    /** @} */ // end of api_addr_range
 
     /**
      * Find entry that intersects with the given address range
@@ -129,9 +116,6 @@ class AddrRangeMap
      *
      * @param r An input address
      * @return An iterator that intersects with the input address range
-     *
-     * @ingroup api_addr_range
-     * @{
      */
     const_iterator
     intersects(const AddrRange &r) const
@@ -143,11 +127,7 @@ class AddrRangeMap
     {
         return find(r, [r](const AddrRange r1) { return r.intersects(r1); });
     }
-    /** @} */ // end of api_addr_range
 
-    /**
-     * @ingroup api_addr_range
-     */
     iterator
     insert(const AddrRange &r, const V& d)
     {
@@ -157,9 +137,6 @@ class AddrRangeMap
         return tree.insert(std::make_pair(r, d)).first;
     }
 
-    /**
-     * @ingroup api_addr_range
-     */
     void
     erase(iterator p)
     {
@@ -167,9 +144,6 @@ class AddrRangeMap
         tree.erase(p);
     }
 
-    /**
-     * @ingroup api_addr_range
-     */
     void
     erase(iterator p, iterator q)
     {
@@ -179,9 +153,6 @@ class AddrRangeMap
         tree.erase(p,q);
     }
 
-    /**
-     * @ingroup api_addr_range
-     */
     void
     clear()
     {
@@ -189,54 +160,36 @@ class AddrRangeMap
         tree.erase(tree.begin(), tree.end());
     }
 
-    /**
-     * @ingroup api_addr_range
-     */
     const_iterator
     begin() const
     {
         return tree.begin();
     }
 
-    /**
-     * @ingroup api_addr_range
-     */
     iterator
     begin()
     {
         return tree.begin();
     }
 
-    /**
-     * @ingroup api_addr_range
-     */
     const_iterator
     end() const
     {
         return tree.end();
     }
 
-    /**
-     * @ingroup api_addr_range
-     */
     iterator
     end()
     {
         return tree.end();
     }
 
-    /**
-     * @ingroup api_addr_range
-     */
     std::size_t
     size() const
     {
         return tree.size();
     }
 
-    /**
-     * @ingroup api_addr_range
-     */
     bool
     empty() const
     {

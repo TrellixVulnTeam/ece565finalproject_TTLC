@@ -79,7 +79,7 @@ class SimpleMemory : public AbstractMemory
         { }
     };
 
-    class MemoryPort : public ResponsePort
+    class MemoryPort : public SlavePort
     {
       private:
         SimpleMemory& memory;

@@ -849,7 +849,7 @@ class FpOp : public PredOp
             bool flush, uint32_t rMode) const;
 
     void
-    advancePC(PCState &pcState) const override
+    advancePC(PCState &pcState) const
     {
         if (flags[IsLastMicroop]) {
             pcState.uEnd();

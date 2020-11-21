@@ -78,13 +78,16 @@ class ISA : public BaseISA
   public:
     typedef RiscvISAParams Params;
 
+    void clear(ThreadContext *tc) { clear(); }
+
+  protected:
     void clear();
 
   public:
     RegVal readMiscRegNoEffect(int misc_reg) const;
-    RegVal readMiscReg(int misc_reg);
+    RegVal readMiscReg(int misc_reg, ThreadContext *tc);
     void setMiscRegNoEffect(int misc_reg, RegVal val);
-    void setMiscReg(int misc_reg, RegVal val);
+    void setMiscReg(int misc_reg, RegVal val, ThreadContext *tc);
 
     RegId flattenRegId(const RegId &regId) const { return regId; }
     int flattenIntIndex(int reg) const { return reg; }
@@ -95,8 +98,13 @@ class ISA : public BaseISA
     int flattenCCIndex(int reg) const { return reg; }
     int flattenMiscIndex(int reg) const { return reg; }
 
+    void startup(ThreadContext *tc) {}
+
     void serialize(CheckpointOut &cp) const;
     void unserialize(CheckpointIn &cp);
+
+    /// Explicitly import the otherwise hidden startup
+    using BaseISA::startup;
 
     const Params *params() const;
 

@@ -47,114 +47,55 @@
 #include "base/trace.hh"
 #include "sim/sim_object.hh"
 
-namespace
-{
-
-class DefaultRequestPort : public RequestPort
-{
-  protected:
-    [[noreturn]] void
-    blowUp() const
-    {
-        throw UnboundPortException();
-    }
-
-  public:
-    DefaultRequestPort() : RequestPort("default_request_port", nullptr) {}
-
-    // Atomic protocol.
-    Tick recvAtomicSnoop(PacketPtr) override { blowUp(); }
-
-    // Timing protocol.
-    bool recvTimingResp(PacketPtr) override { blowUp(); }
-    void recvTimingSnoopReq(PacketPtr) override { blowUp(); }
-    void recvReqRetry() override { blowUp(); }
-    void recvRetrySnoopResp() override { blowUp(); }
-
-    // Functional protocol.
-    void recvFunctionalSnoop(PacketPtr) override { blowUp(); }
-};
-
-class DefaultResponsePort : public ResponsePort
-{
-  protected:
-    [[noreturn]] void
-    blowUp() const
-    {
-        throw UnboundPortException();
-    }
-
-  public:
-    DefaultResponsePort() : ResponsePort("default_response_port", nullptr) {}
-
-    // Atomic protocol.
-    Tick recvAtomic(PacketPtr) override { blowUp(); }
-
-    // Timing protocol.
-    bool recvTimingReq(PacketPtr) override { blowUp(); }
-    bool tryTiming(PacketPtr) override { blowUp(); }
-    bool recvTimingSnoopResp(PacketPtr) override { blowUp(); }
-    void recvRespRetry() override { blowUp(); }
-
-    // Functional protocol.
-    void recvFunctional(PacketPtr) override { blowUp(); }
-
-    // General.
-    AddrRangeList getAddrRanges() const override { return AddrRangeList(); }
-};
-
-DefaultRequestPort defaultRequestPort;
-DefaultResponsePort defaultResponsePort;
-
-} // anonymous namespace
-
 /**
- * Request port
+ * Master port
  */
-RequestPort::RequestPort(const std::string& name, SimObject* _owner,
-    PortID _id) : Port(name, _id), _responsePort(&defaultResponsePort),
-    owner(*_owner)
+MasterPort::MasterPort(const std::string& name, SimObject* _owner, PortID _id)
+    : Port(name, _id), _slavePort(NULL), owner(*_owner)
 {
 }
 
-RequestPort::~RequestPort()
+MasterPort::~MasterPort()
 {
 }
 
 void
-RequestPort::bind(Port &peer)
+MasterPort::bind(Port &peer)
 {
-    auto *response_port = dynamic_cast<ResponsePort *>(&peer);
-    fatal_if(!response_port, "Can't bind port %s to non-response port %s.",
-             name(), peer.name());
-    // request port keeps track of the response port
-    _responsePort = response_port;
+    auto *slave_port = dynamic_cast<SlavePort *>(&peer);
+    if (!slave_port) {
+        fatal("Attempt to bind port %s to non-slave port %s.",
+                name(), peer.name());
+    }
+    // master port keeps track of the slave port
+    _slavePort = slave_port;
     Port::bind(peer);
-    // response port also keeps track of request port
-    _responsePort->responderBind(*this);
+    // slave port also keeps track of master port
+    _slavePort->slaveBind(*this);
 }
 
 void
-RequestPort::unbind()
+MasterPort::unbind()
 {
-    panic_if(!isConnected(), "Can't unbind request port %s which is "
-    "not bound.", name());
-    _responsePort->responderUnbind();
-    _responsePort = &defaultResponsePort;
+    if (_slavePort == NULL)
+        panic("Attempting to unbind master port %s that is not connected\n",
+              name());
+    _slavePort->slaveUnbind();
+    _slavePort = nullptr;
     Port::unbind();
 }
 
 AddrRangeList
-RequestPort::getAddrRanges() const
+MasterPort::getAddrRanges() const
 {
-    return _responsePort->getAddrRanges();
+    return _slavePort->getAddrRanges();
 }
 
 void
-RequestPort::printAddr(Addr a)
+MasterPort::printAddr(Addr a)
 {
     auto req = std::make_shared<Request>(
-        a, 1, 0, Request::funcRequestorId);
+        a, 1, 0, Request::funcMasterId);
 
     Packet pkt(req, MemCmd::PrintReq);
     Packet::PrintReqState prs(std::cerr);
@@ -164,34 +105,34 @@ RequestPort::printAddr(Addr a)
 }
 
 /**
- * Response port
+ * Slave port
  */
-ResponsePort::ResponsePort(const std::string& name, SimObject* _owner,
-    PortID id) : Port(name, id), _requestPort(&defaultRequestPort),
-    defaultBackdoorWarned(false), owner(*_owner)
+SlavePort::SlavePort(const std::string& name, SimObject* _owner, PortID id)
+    : Port(name, id), _masterPort(NULL), defaultBackdoorWarned(false),
+    owner(*_owner)
 {
 }
 
-ResponsePort::~ResponsePort()
+SlavePort::~SlavePort()
 {
 }
 
 void
-ResponsePort::responderUnbind()
+SlavePort::slaveUnbind()
 {
-    _requestPort = &defaultRequestPort;
+    _masterPort = NULL;
     Port::unbind();
 }
 
 void
-ResponsePort::responderBind(RequestPort& request_port)
+SlavePort::slaveBind(MasterPort& master_port)
 {
-    _requestPort = &request_port;
-    Port::bind(request_port);
+    _masterPort = &master_port;
+    Port::bind(master_port);
 }
 
 Tick
-ResponsePort::recvAtomicBackdoor(PacketPtr pkt, MemBackdoorPtr &backdoor)
+SlavePort::recvAtomicBackdoor(PacketPtr pkt, MemBackdoorPtr &backdoor)
 {
     if (!defaultBackdoorWarned) {
         warn("Port %s doesn't support requesting a back door.", name());

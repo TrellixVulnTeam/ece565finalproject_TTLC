@@ -26,10 +26,17 @@
 #
 # Authors: Sean Wilson
 
+import copy
+import traceback
+
 import testlib.helper as helper
+import testlib.log as log
 
 class SkipException(Exception):
     def __init__(self, fixture, testitem):
+        self.fixture = fixture
+        self.testitem = testitem
+
         self.msg = 'Fixture "%s" raised SkipException for "%s".' % (
                fixture.name, testitem.name
         )
@@ -67,13 +74,20 @@ class Fixture(object):
     def skip(self, testitem):
         raise SkipException(self.name, testitem.metadata)
 
+    def init(self, *args, **kwargs):
+        pass
+
     def setup(self, testitem):
         pass
 
-    def post_test_procedure(self, testitem):
+    def teardown(self, testitem):
         pass
 
-    def teardown(self, testitem):
+    def skip_cleanup(self):
+        '''
+        If this method is called, then we should make sure that nothing is
+        done when the teardown() function is called.
+        '''
         pass
 
     def set_global(self):

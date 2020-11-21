@@ -94,7 +94,7 @@ class Stride : public Queued
     /** Confidence threshold for prefetch generation. */
     const double threshConf;
 
-    const bool useRequestorId;
+    const bool useMasterId;
 
     const int degree;
 

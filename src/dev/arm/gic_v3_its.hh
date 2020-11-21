@@ -77,14 +77,14 @@ class Gicv3Its : public BasicPioDevice
     friend class ::ItsTranslation;
     friend class ::ItsCommand;
   public:
-    class DataPort : public RequestPort
+    class DataPort : public MasterPort
     {
       protected:
         Gicv3Its &its;
 
       public:
         DataPort(const std::string &_name, Gicv3Its &_its) :
-            RequestPort(_name, &_its),
+            MasterPort(_name, &_its),
             its(_its)
         {}
 
@@ -319,7 +319,7 @@ class Gicv3Its : public BasicPioDevice
 
   private:
     std::queue<ItsAction> packetsToRetry;
-    uint32_t requestorId;
+    uint32_t masterId;
     Gicv3 *gic;
     EventFunctionWrapper commandEvent;
 

@@ -28,11 +28,8 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "sim/eventq.hh"
-
 #include <cassert>
 #include <iostream>
-#include <mutex>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -42,6 +39,7 @@
 #include "cpu/smt.hh"
 #include "debug/Checkpoint.hh"
 #include "sim/core.hh"
+#include "sim/eventq_impl.hh"
 
 using namespace std;
 

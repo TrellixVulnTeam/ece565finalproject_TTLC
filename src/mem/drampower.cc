@@ -40,20 +40,20 @@
 #include "base/intmath.hh"
 #include "sim/core.hh"
 
-DRAMPower::DRAMPower(const DRAMInterfaceParams* p, bool include_io) :
+DRAMPower::DRAMPower(const DRAMCtrlParams* p, bool include_io) :
     powerlib(libDRAMPower(getMemSpec(p), include_io))
 {
 }
 
 Data::MemArchitectureSpec
-DRAMPower::getArchParams(const DRAMInterfaceParams* p)
+DRAMPower::getArchParams(const DRAMCtrlParams* p)
 {
     Data::MemArchitectureSpec archSpec;
     archSpec.burstLength = p->burst_length;
     archSpec.nbrOfBanks = p->banks_per_rank;
     // One DRAMPower instance per rank, hence set this to 1
     archSpec.nbrOfRanks = 1;
-    archSpec.dataRate = p->beats_per_clock;
+    archSpec.dataRate = getDataRate(p);
     // For now we can ignore the number of columns and rows as they
     // are not used in the power calculation.
     archSpec.nbrOfColumns = 0;
@@ -68,7 +68,7 @@ DRAMPower::getArchParams(const DRAMInterfaceParams* p)
 }
 
 Data::MemTimingSpec
-DRAMPower::getTimingParams(const DRAMInterfaceParams* p)
+DRAMPower::getTimingParams(const DRAMCtrlParams* p)
 {
     // Set the values that are used for power calculations and ignore
     // the ones only used by the controller functionality in DRAMPower
@@ -100,7 +100,7 @@ DRAMPower::getTimingParams(const DRAMInterfaceParams* p)
 }
 
 Data::MemPowerSpec
-DRAMPower::getPowerParams(const DRAMInterfaceParams* p)
+DRAMPower::getPowerParams(const DRAMCtrlParams* p)
 {
     // All DRAMPower currents are in mA
     Data::MemPowerSpec powerSpec;
@@ -132,7 +132,7 @@ DRAMPower::getPowerParams(const DRAMInterfaceParams* p)
 }
 
 Data::MemorySpecification
-DRAMPower::getMemSpec(const DRAMInterfaceParams* p)
+DRAMPower::getMemSpec(const DRAMCtrlParams* p)
 {
     Data::MemorySpecification memSpec;
     memSpec.memArchSpec = getArchParams(p);
@@ -142,13 +142,13 @@ DRAMPower::getMemSpec(const DRAMInterfaceParams* p)
 }
 
 bool
-DRAMPower::hasTwoVDD(const DRAMInterfaceParams* p)
+DRAMPower::hasTwoVDD(const DRAMCtrlParams* p)
 {
     return p->VDD2 == 0 ? false : true;
 }
 
 uint8_t
-DRAMPower::getDataRate(const DRAMInterfaceParams* p)
+DRAMPower::getDataRate(const DRAMCtrlParams* p)
 {
     uint32_t burst_cycles = divCeil(p->tBURST_MAX, p->tCK);
     uint8_t data_rate = p->burst_length / burst_cycles;

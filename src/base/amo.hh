@@ -39,13 +39,8 @@
 
 struct AtomicOpFunctor
 {
-    /**
-     * @ingroup api_atomic_op
-     * @{
-     */
     virtual void operator()(uint8_t *p) = 0;
     virtual AtomicOpFunctor* clone() = 0;
-    /** @} */ // end of api_atomic_op
     virtual ~AtomicOpFunctor() {}
 };
 
@@ -54,9 +49,6 @@ struct TypedAtomicOpFunctor : public AtomicOpFunctor
 {
     void operator()(uint8_t *p) { execute((T *)p); }
     virtual AtomicOpFunctor* clone() = 0;
-    /**
-     * @ingroup api_atomic_op
-     */
     virtual void execute(T * p) = 0;
 };
 
@@ -233,9 +225,6 @@ class AtomicOpMin : public TypedAtomicOpFunctor<T>
     AtomicOpFunctor* clone () { return new AtomicOpMin(a); }
 };
 
-/**
- * @ingroup api_atomic_op
- */
 typedef std::unique_ptr<AtomicOpFunctor> AtomicOpFunctorPtr;
 
 #endif // __BASE_AMO_HH__

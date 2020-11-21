@@ -161,8 +161,10 @@ MinorCPU::startup()
 
     BaseCPU::startup();
 
-    for (ThreadID tid = 0; tid < numThreads; tid++)
+    for (ThreadID tid = 0; tid < numThreads; tid++) {
+        threads[tid]->startup();
         pipeline->wakeupFetch(tid);
+    }
 }
 
 DrainState

@@ -36,7 +36,7 @@ class SparcLinux : public Linux
 {
   public:
 
-    static const ByteOrder byteOrder = ByteOrder::big;
+    static const ByteOrder byteOrder = BigEndianByteOrder;
 
     struct tgt_stat
     {
@@ -230,11 +230,6 @@ class SparcLinux : public Linux
 
         if (stack)
             ctc->setIntReg(SparcISA::StackPointerReg, stack);
-
-        // Set these extra values. Since "clone" doesn't return two values,
-        // we can set these and they won't be clobbered by the syscall ABI.
-        ptc->setIntReg(SparcISA::SyscallPseudoReturnReg, 0);
-        ctc->setIntReg(SparcISA::SyscallPseudoReturnReg, 1);
     }
 };
 

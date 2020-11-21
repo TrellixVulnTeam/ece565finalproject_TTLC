@@ -91,7 +91,7 @@ MemTest::MemTest(const Params *p)
       percentReads(p->percent_reads),
       percentFunctional(p->percent_functional),
       percentUncacheable(p->percent_uncacheable),
-      requestorId(p->system->getRequestorId(this)),
+      masterId(p->system->getMasterId(this)),
       blockSize(p->system->cacheLineSize()),
       blockAddrMask(blockSize - 1),
       progressInterval(p->progress_interval),
@@ -99,7 +99,7 @@ MemTest::MemTest(const Params *p)
       nextProgressMessage(p->progress_interval),
       maxLoads(p->max_loads),
       atomic(p->system->isAtomicMode()),
-      suppressFuncErrors(p->suppress_func_errors), stats(this)
+      suppressFuncErrors(p->suppress_func_errors)
 {
     id = TESTER_ALLOCATOR++;
     fatal_if(id >= blockSize, "Too many testers, only %d allowed\n",
@@ -160,7 +160,7 @@ MemTest::completeRequest(PacketPtr pkt, bool functional)
             }
 
             numReads++;
-            stats.numReads++;
+            numReadsStat++;
 
             if (numReads == (uint64_t)nextProgressMessage) {
                 ccprintf(cerr, "%s: completed %d read, %d write accesses @%d\n",
@@ -176,7 +176,7 @@ MemTest::completeRequest(PacketPtr pkt, bool functional)
             // update the reference data
             referenceData[req->getPaddr()] = pkt_data[0];
             numWrites++;
-            stats.numWrites++;
+            numWritesStat++;
         }
     }
 
@@ -190,12 +190,23 @@ MemTest::completeRequest(PacketPtr pkt, bool functional)
     else if (noResponseEvent.scheduled())
         deschedule(noResponseEvent);
 }
-MemTest::MemTestStats::MemTestStats(Stats::Group *parent)
-      : Stats::Group(parent),
-      ADD_STAT(numReads, "number of read accesses completed"),
-      ADD_STAT(numWrites, "number of write accesses completed")
-{
 
+void
+MemTest::regStats()
+{
+    ClockedObject::regStats();
+
+    using namespace Stats;
+
+    numReadsStat
+        .name(name() + ".num_reads")
+        .desc("number of read accesses completed")
+        ;
+
+    numWritesStat
+        .name(name() + ".num_writes")
+        .desc("number of write accesses completed")
+        ;
 }
 
 void
@@ -230,7 +241,7 @@ MemTest::tick()
 
     bool do_functional = (random_mt.random(0, 100) < percentFunctional) &&
         !uncacheable;
-    RequestPtr req = std::make_shared<Request>(paddr, 1, flags, requestorId);
+    RequestPtr req = std::make_shared<Request>(paddr, 1, flags, masterId);
     req->setContext(id);
 
     outstandingAddrs.insert(paddr);
@@ -245,7 +256,7 @@ MemTest::tick()
     if (cmd < percentReads) {
         // start by ensuring there is a reference value if we have not
         // seen this address before
-        M5_VAR_USED uint8_t ref_data = 0;
+        uint8_t M5_VAR_USED ref_data = 0;
         auto ref = referenceData.find(req->getPaddr());
         if (ref == referenceData.end()) {
             referenceData[req->getPaddr()] = 0;

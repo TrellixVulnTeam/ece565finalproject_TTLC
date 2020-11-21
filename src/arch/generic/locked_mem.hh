@@ -47,15 +47,12 @@
  * Generic helper functions for locked memory accesses.
  */
 
+#include "config/the_isa.hh"
 #include "mem/packet.hh"
 #include "mem/request.hh"
 
-namespace GenericISA
+namespace TheISA
 {
-
-namespace LockedMem
-{
-
 template <class XC>
 inline void
 handleLockedSnoop(XC *xc, PacketPtr pkt, Addr cacheBlockMask)
@@ -87,8 +84,6 @@ inline void
 globalClearExclusive(XC *xc)
 {
 }
-
-} // namespace LockedMem
 
 } // namespace Generic ISA
 

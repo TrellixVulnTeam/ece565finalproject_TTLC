@@ -47,8 +47,6 @@
 #include "params/ArmNativeTrace.hh"
 #include "sim/byteswap.hh"
 
-using namespace ArmISA;
-
 namespace Trace {
 
 #if TRACING_ON

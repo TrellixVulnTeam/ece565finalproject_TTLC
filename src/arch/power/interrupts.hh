@@ -40,6 +40,9 @@ namespace PowerISA {
 
 class Interrupts : public BaseInterrupts
 {
+  private:
+    BaseCPU * cpu;
+
   public:
     typedef PowerInterruptsParams Params;
 
@@ -49,7 +52,14 @@ class Interrupts : public BaseInterrupts
         return dynamic_cast<const Params *>(_params);
     }
 
-    Interrupts(Params *p) : BaseInterrupts(p) {}
+    Interrupts(Params * p) : BaseInterrupts(p), cpu(NULL)
+    {}
+
+    void
+    setCPU(BaseCPU * _cpu)
+    {
+        cpu = _cpu;
+    }
 
     void
     post(int int_num, int index)
@@ -70,20 +80,20 @@ class Interrupts : public BaseInterrupts
     }
 
     bool
-    checkInterrupts() const
+    checkInterrupts(ThreadContext *tc) const
     {
         panic("Interrupts::checkInterrupts not implemented.\n");
     }
 
     Fault
-    getInterrupt()
+    getInterrupt(ThreadContext *tc)
     {
-        assert(checkInterrupts());
+        assert(checkInterrupts(tc));
         panic("Interrupts::getInterrupt not implemented.\n");
     }
 
     void
-    updateIntrInfo()
+    updateIntrInfo(ThreadContext *tc)
     {
         panic("Interrupts::updateIntrInfo not implemented.\n");
     }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019-2020 Inria
+ * Copyright (c) 2019 Inria
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -38,21 +38,27 @@
 #include "debug/CacheComp.hh"
 #include "params/PerfectCompressor.hh"
 
-namespace Compressor {
-
-Perfect::Perfect(const Params *p)
-  : Base(p), compressedSize(8 * blkSize / p->max_compression_ratio),
-    compressionLatency(p->compression_latency),
-    decompressionLatency(p->decompression_latency)
+PerfectCompressor::CompData::CompData(const uint64_t* data,
+    std::size_t num_entries)
+    : CompressionData(), entries(data, data + num_entries)
 {
 }
 
-std::unique_ptr<Base::CompressionData>
-Perfect::compress(const std::vector<Chunk>& chunks,
-    Cycles& comp_lat, Cycles& decomp_lat)
+PerfectCompressor::PerfectCompressor(const Params *p)
+    : BaseCacheCompressor(p),
+      compressedSize(8 * blkSize / p->max_compression_ratio),
+      compressionLatency(p->compression_latency),
+      decompressionLatency(p->decompression_latency)
+{
+}
+
+std::unique_ptr<BaseCacheCompressor::CompressionData>
+PerfectCompressor::compress(const uint64_t* cache_line, Cycles& comp_lat,
+    Cycles& decomp_lat)
 {
     // Compress every word sequentially
-    std::unique_ptr<Base::CompressionData> comp_data(new CompData(chunks));
+    std::unique_ptr<BaseCacheCompressor::CompressionData> comp_data(
+        new CompData(cache_line, blkSize/8));
 
     // Set relevant metadata
     comp_data->setSizeBits(compressedSize);
@@ -63,17 +69,18 @@ Perfect::compress(const std::vector<Chunk>& chunks,
 }
 
 void
-Perfect::decompress(const CompressionData* comp_data,
+PerfectCompressor::decompress(const CompressionData* comp_data,
     uint64_t* data)
 {
     // Decompress every entry sequentially
-    fromChunks(static_cast<const CompData*>(comp_data)->chunks, data);
+    const std::vector<uint64_t>& entries =
+        static_cast<const CompData*>(comp_data)->entries;
+    assert(entries.size() == (blkSize/8));
+    std::copy(entries.begin(), entries.end(), data);
 }
 
-} // namespace Compressor
-
-Compressor::Perfect*
+PerfectCompressor*
 PerfectCompressorParams::create()
 {
-    return new Compressor::Perfect(this);
+    return new PerfectCompressor(this);
 }

@@ -68,7 +68,7 @@ using namespace X86ISA;
 // data) is used to indicate that a segment has been accessed.
 #define SEG_TYPE_BIT_ACCESSED 1
 
-struct M5_ATTR_PACKED FXSave
+struct FXSave
 {
     uint16_t fcw;
     uint16_t fsw;
@@ -97,7 +97,7 @@ struct M5_ATTR_PACKED FXSave
     uint8_t xmm[16][16];
 
     uint64_t reserved[12];
-};
+} M5_ATTR_PACKED;
 
 static_assert(sizeof(FXSave) == 512, "Unexpected size of FXSave");
 
@@ -1141,8 +1141,8 @@ X86KvmCPU::deliverInterrupts()
         // they are getInterrupt() and updateIntrInfo() are called
         // atomically.
         EventQueue::ScopedMigration migrate(interrupts[0]->eventQueue());
-        fault = interrupts[0]->getInterrupt();
-        interrupts[0]->updateIntrInfo();
+        fault = interrupts[0]->getInterrupt(tc);
+        interrupts[0]->updateIntrInfo(tc);
     }
 
     X86Interrupt *x86int(dynamic_cast<X86Interrupt *>(fault.get()));
@@ -1200,7 +1200,7 @@ X86KvmCPU::kvmRun(Tick ticks)
             // the thread context and check if there are /really/
             // interrupts that should be delivered now.
             syncThreadContext();
-            if (lapic->checkInterrupts()) {
+            if (lapic->checkInterrupts(tc)) {
                 DPRINTF(KvmInt,
                         "M5 has pending interrupts, delivering interrupt.\n");
 
@@ -1351,7 +1351,7 @@ X86KvmCPU::handleKvmExitIO()
     for (int i = 0; i < count; ++i) {
         RequestPtr io_req = std::make_shared<Request>(
             pAddr, kvm_run.io.size,
-            Request::UNCACHEABLE, dataRequestorId());
+            Request::UNCACHEABLE, dataMasterId());
 
         io_req->setContext(tc->contextId());
 

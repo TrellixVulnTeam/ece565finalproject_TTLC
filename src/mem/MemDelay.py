@@ -41,14 +41,8 @@ class MemDelay(ClockedObject):
     cxx_header = 'mem/mem_delay.hh'
     abstract = True
 
-    mem_side_port = RequestPort("This port sends requests and "
-                                            "receives responses")
-    master   = DeprecatedParam(mem_side_port,
-                                '`master` is now called `mem_side_port`')
-    cpu_side_port = ResponsePort("This port receives requests and "
-                                                "sends responses")
-    slave    = DeprecatedParam(cpu_side_port,
-                                '`slave` is now called `cpu_side_port`')
+    master = MasterPort("Master port")
+    slave = SlavePort("Slave port")
 
 class SimpleMemDelay(MemDelay):
     type = 'SimpleMemDelay'

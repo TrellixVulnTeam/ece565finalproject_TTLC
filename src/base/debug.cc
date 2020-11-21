@@ -1,16 +1,4 @@
 /*
- * Copyright (c) 2020 ARM Limited
- * All rights reserved
- *
- * The license below extends only to copyright in the software and shall
- * not be construed as granting a license to any other intellectual
- * property including but not limited to intellectual property relating
- * to a hardware implementation of the functionality of the software
- * licensed hereunder.  You may use the software subject to the license
- * terms below provided that you ensure that this notice is replicated
- * unmodified and in its entirety in all distributions of the software,
- * modified or unmodified, in source code or in binary form.
- *
  * Copyright (c) 2003-2005 The Regents of The University of Michigan
  * All rights reserved.
  *
@@ -79,7 +67,7 @@ allFlags()
     return flags;
 }
 
-bool Flag::_globalEnable = false;
+bool SimpleFlag::_active = false;
 
 Flag *
 findFlag(const std::string &name)
@@ -108,17 +96,17 @@ Flag::~Flag()
 }
 
 void
-Flag::globalEnable()
+SimpleFlag::enableAll()
 {
-    _globalEnable = true;
+    _active = true;
     for (auto& i : allFlags())
         i.second->sync();
 }
 
 void
-Flag::globalDisable()
+SimpleFlag::disableAll()
 {
-    _globalEnable = false;
+    _active = false;
     for (auto& i : allFlags())
         i.second->sync();
 }
@@ -137,19 +125,35 @@ CompoundFlag::disable()
         k->disable();
 }
 
-bool
-CompoundFlag::status() const
+struct AllFlags : public Flag
 {
-    if (_kids.empty())
-        return false;
+    AllFlags()
+        : Flag("All", "All Flags")
+    {}
 
-    for (auto& k : _kids) {
-        if (!k->status())
-            return false;
+    void
+    enable()
+    {
+        FlagsMap::iterator i = allFlags().begin();
+        FlagsMap::iterator end = allFlags().end();
+        for (; i != end; ++i)
+            if (i->second != this)
+                i->second->enable();
     }
 
-    return true;
-}
+    void
+    disable()
+    {
+        FlagsMap::iterator i = allFlags().begin();
+        FlagsMap::iterator end = allFlags().end();
+        for (; i != end; ++i)
+            if (i->second != this)
+                i->second->disable();
+    }
+};
+
+AllFlags theAllFlags;
+Flag *const All = &theAllFlags;
 
 bool
 changeFlag(const char *s, bool value)

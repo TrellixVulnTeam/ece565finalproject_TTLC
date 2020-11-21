@@ -38,7 +38,7 @@
 class ArmFreebsd : public FreeBSD
 {
   public:
-    static const ByteOrder byteOrder = ByteOrder::little;
+    static const ByteOrder byteOrder = LittleEndianByteOrder;
 };
 
 class ArmFreebsd32 : public ArmFreebsd

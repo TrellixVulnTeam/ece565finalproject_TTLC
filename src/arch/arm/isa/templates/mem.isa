@@ -206,10 +206,7 @@ def template NeonLoadExecute {{
         if (%(predicate_test)s)
         {
             if (fault == NoFault) {
-                const auto size = %(size)d;
-                fault = readMemAtomic(xc, EA, dataPtr,
-                                      size, memAccessFlags,
-                                      std::vector<bool>(size, true));
+                fault = xc->readMem(EA, dataPtr, %(size)d, memAccessFlags);
                 %(memacc_code)s;
             }
 
@@ -280,10 +277,8 @@ def template NeonStoreExecute {{
             }
 
             if (fault == NoFault) {
-                const auto size = %(size)d;
-                fault = writeMemAtomic(xc, dataPtr, EA, size,
-                                       memAccessFlags, NULL,
-                                       std::vector<bool>(size, true));
+                fault = xc->writeMem(dataPtr, %(size)d, EA,
+                                     memAccessFlags, NULL);
             }
 
             if (fault == NoFault) {
@@ -415,10 +410,8 @@ def template NeonStoreInitiateAcc {{
             }
 
             if (fault == NoFault) {
-                const auto size = %(size)d;
-                fault = writeMemTiming(xc, memUnion.bytes, EA,
-                                       size, memAccessFlags, nullptr,
-                                       std::vector<bool>(size, true));
+                fault = xc->writeMem(memUnion.bytes, %(size)d, EA,
+                                     memAccessFlags, NULL);
             }
         } else {
             xc->setPredicate(false);
@@ -469,9 +462,7 @@ def template NeonLoadInitiateAcc {{
         if (%(predicate_test)s)
         {
             if (fault == NoFault) {
-                const auto size = %(size)d;
-                fault = initiateMemRead(xc, EA, size, memAccessFlags,
-                                        std::vector<bool>(size, true));
+                fault = xc->initiateMemRead(EA, %(size)d, memAccessFlags);
             }
         } else {
             xc->setPredicate(false);
@@ -693,7 +684,7 @@ def template LoadStoreImmDeclare {{
                           Trace::InstRecord *) const override;
 
         void
-        annotateFault(ArmISA::ArmFault *fault) override
+        annotateFault(ArmFault *fault) override
         {
             %(fa_code)s
         }
@@ -762,7 +753,7 @@ def template StoreRegDeclare {{
                           Trace::InstRecord *) const override;
 
         void
-        annotateFault(ArmISA::ArmFault *fault) override
+        annotateFault(ArmFault *fault) override
         {
             %(fa_code)s
         }
@@ -811,7 +802,7 @@ def template LoadRegDeclare {{
                           Trace::InstRecord *) const override;
 
         void
-        annotateFault(ArmISA::ArmFault *fault) override
+        annotateFault(ArmFault *fault) override
         {
             %(fa_code)s
         }
@@ -836,7 +827,7 @@ def template LoadImmDeclare {{
                           Trace::InstRecord *) const override;
 
         void
-        annotateFault(ArmISA::ArmFault *fault) override
+        annotateFault(ArmFault *fault) override
         {
             %(fa_code)s
         }
@@ -1126,7 +1117,7 @@ def template LoadRegConstructor {{
                  (IntRegIndex)_index)
     {
         %(constructor)s;
-        M5_VAR_USED bool conditional = false;
+        bool conditional M5_VAR_USED = false;
         if (!(condCode == COND_AL || condCode == COND_UC)) {
             conditional = true;
             for (int x = 0; x < _numDestRegs; x++) {
@@ -1192,7 +1183,7 @@ def template LoadImmConstructor {{
                  (IntRegIndex)_dest, (IntRegIndex)_base, _add, _imm)
     {
         %(constructor)s;
-        M5_VAR_USED bool conditional = false;
+        bool conditional M5_VAR_USED = false;
         if (!(condCode == COND_AL || condCode == COND_UC)) {
             conditional = true;
             for (int x = 0; x < _numDestRegs; x++) {

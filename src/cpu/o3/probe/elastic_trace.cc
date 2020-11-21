@@ -54,8 +54,7 @@ ElasticTrace::ElasticTrace(const ElasticTraceParams* params)
        instTraceStream(nullptr),
        startTraceInst(params->startTraceInst),
        allProbesReg(false),
-       traceVirtAddr(params->traceVirtAddr),
-       stats(this)
+       traceVirtAddr(params->traceVirtAddr)
 {
     cpu = dynamic_cast<FullO3CPU<O3CPUImpl>*>(params->manager);
     fatal_if(!cpu, "Manager of %s is not of type O3CPU and thus does not "\
@@ -89,7 +88,9 @@ ElasticTrace::ElasticTrace(const ElasticTraceParams* params)
     data_rec_header.set_window_size(depWindowSize);
     dataTraceStream->write(data_rec_header);
     // Register a callback to flush trace records and close the output streams.
-    registerExitCallback([this]() {  flushTraces(); });
+    Callback* cb = new MakeCallback<ElasticTrace,
+        &ElasticTrace::flushTraces>(this);
+    registerExitCallback(cb);
 }
 
 void
@@ -194,8 +195,8 @@ ElasticTrace::recordExecTick(const DynInstConstPtr& dyn_inst)
     }
 
     exec_info_ptr->executeTick = curTick();
-    stats.maxTempStoreSize = std::max(tempStore.size(),
-                                (std::size_t)stats.maxTempStoreSize.value());
+    maxTempStoreSize = std::max(tempStore.size(),
+                                (std::size_t)maxTempStoreSize.value());
 }
 
 void
@@ -283,8 +284,8 @@ ElasticTrace::updateRegDep(const DynInstConstPtr& dyn_inst)
             physRegDepMap[phys_dest_reg->flatIndex()] = seq_num;
         }
     }
-    stats.maxPhysRegDepMapSize = std::max(physRegDepMap.size(),
-                            (std::size_t)stats.maxPhysRegDepMapSize.value());
+    maxPhysRegDepMapSize = std::max(physRegDepMap.size(),
+                                    (std::size_t)maxPhysRegDepMapSize.value());
 }
 
 void
@@ -451,7 +452,7 @@ ElasticTrace::addDepTraceRecord(const DynInstConstPtr& head_inst,
             TraceInfo* reg_dep = trace_info_itr->second;
             reg_dep->numDepts++;
             compDelayPhysRegDep(reg_dep, new_record);
-            ++stats.numRegDep;
+            ++numRegDep;
         } else {
             // The instruction that this has a register dependency on was
             // not added to the trace because of one of the following
@@ -534,7 +535,7 @@ ElasticTrace::updateCommitOrderDep(TraceInfo* new_record,
             if (hasLoadCompleted(past_record, execute_tick)) {
                 // Assign rob dependency and calculate the computational delay
                 assignRobDep(past_record, new_record);
-                ++stats.numRegDep;
+                ++numOrderDepStores;
                 return;
             }
         } else {
@@ -543,7 +544,7 @@ ElasticTrace::updateCommitOrderDep(TraceInfo* new_record,
             if (hasStoreCommitted(past_record, execute_tick)) {
                 // Assign rob dependency and calculate the computational delay
                 assignRobDep(past_record, new_record);
-                ++stats.numRegDep;
+                ++numOrderDepStores;
                 return;
             }
         }
@@ -568,15 +569,15 @@ ElasticTrace::updateIssueOrderDep(TraceInfo* new_record)
     if (new_record->isLoad()) {
         // The execution time of a load is when a request is sent
         execute_tick = new_record->executeTick;
-        ++stats.numIssueOrderDepLoads;
+        ++numIssueOrderDepLoads;
     } else if (new_record->isStore()) {
         // The execution time of a store is when it is sent, i.e. committed
         execute_tick = curTick();
-        ++stats.numIssueOrderDepStores;
+        ++numIssueOrderDepStores;
     } else {
         // The execution time of a non load/store is when it completes
         execute_tick = new_record->toCommitTick;
-        ++stats.numIssueOrderDepOther;
+        ++numIssueOrderDepOther;
     }
 
     // We search if this record has an issue order dependency on a past record.
@@ -611,8 +612,8 @@ ElasticTrace::assignRobDep(TraceInfo* past_record, TraceInfo* new_record) {
     // Increment number of dependents of the past record
     ++(past_record->numDepts);
     // Update stat to log max number of dependents
-    stats.maxNumDependents = std::max(past_record->numDepts,
-                                (uint32_t)stats.maxNumDependents.value());
+    maxNumDependents = std::max(past_record->numDepts,
+                                (uint32_t)maxNumDependents.value());
 }
 
 bool
@@ -864,7 +865,7 @@ ElasticTrace::writeDepTrace(uint32_t num_to_write)
         } else {
             // Don't write the node to the trace but note that we have filtered
             // out a node.
-            ++stats.numFilteredNodes;
+            ++numFilteredNodes;
             ++num_filtered_nodes;
         }
         dep_trace_itr++;
@@ -875,27 +876,59 @@ ElasticTrace::writeDepTrace(uint32_t num_to_write)
     depTrace.erase(dep_trace_itr_start, dep_trace_itr);
 }
 
-ElasticTrace::ElasticTraceStats::ElasticTraceStats(Stats::Group *parent)
-    : Stats::Group(parent),
-      ADD_STAT(numRegDep, "Number of register dependencies recorded during"
-          " tracing"),
-      ADD_STAT(numOrderDepStores, "Number of commit order (rob) dependencies"
-          " for a store recorded on a past load/store during tracing"),
-      ADD_STAT(numIssueOrderDepLoads, "Number of loads that got assigned"
-          " issue order dependency because they were dependency-free"),
-      ADD_STAT(numIssueOrderDepStores, "Number of stores that got assigned"
-          " issue order dependency because they were dependency-free"),
-      ADD_STAT(numIssueOrderDepOther, "Number of non load/store insts that"
-          " got assigned issue order dependency because they were"
-          " dependency-free"),
-      ADD_STAT(numFilteredNodes, "No. of nodes filtered out before writing"
-          " the output trace"),
-      ADD_STAT(maxNumDependents, "Maximum number or dependents on any"
-          " instruction"),
-      ADD_STAT(maxTempStoreSize, "Maximum size of the temporary store during"
-          " the run"),
-      ADD_STAT(maxPhysRegDepMapSize, "Maximum size of register dependency map")
-{
+void
+ElasticTrace::regStats() {
+    ProbeListenerObject::regStats();
+
+    using namespace Stats;
+    numRegDep
+        .name(name() + ".numRegDep")
+        .desc("Number of register dependencies recorded during tracing")
+        ;
+
+    numOrderDepStores
+        .name(name() + ".numOrderDepStores")
+        .desc("Number of commit order (rob) dependencies for a store recorded"
+              " on a past load/store during tracing")
+        ;
+
+    numIssueOrderDepLoads
+        .name(name() + ".numIssueOrderDepLoads")
+        .desc("Number of loads that got assigned issue order dependency"
+              " because they were dependency-free")
+        ;
+
+    numIssueOrderDepStores
+        .name(name() + ".numIssueOrderDepStores")
+        .desc("Number of stores that got assigned issue order dependency"
+              " because they were dependency-free")
+        ;
+
+    numIssueOrderDepOther
+        .name(name() + ".numIssueOrderDepOther")
+        .desc("Number of non load/store insts that got assigned issue order"
+              " dependency because they were dependency-free")
+        ;
+
+    numFilteredNodes
+        .name(name() + ".numFilteredNodes")
+        .desc("No. of nodes filtered out before writing the output trace")
+        ;
+
+    maxNumDependents
+        .name(name() + ".maxNumDependents")
+        .desc("Maximum number or dependents on any instruction")
+        ;
+
+    maxTempStoreSize
+        .name(name() + ".maxTempStoreSize")
+        .desc("Maximum size of the temporary store during the run")
+        ;
+
+    maxPhysRegDepMapSize
+        .name(name() + ".maxPhysRegDepMapSize")
+        .desc("Maximum size of register dependency map")
+        ;
 }
 
 const std::string&

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012,2015,2018-2020 ARM Limited
+ * Copyright (c) 2012,2015,2018 ARM Limited
  * All rights reserved.
  *
  * The license below extends only to copyright in the software and shall
@@ -115,8 +115,8 @@ PacketQueue::schedSendTiming(PacketPtr pkt, Tick when)
 
     // add a very basic sanity check on the port to ensure the
     // invisible buffer is not growing beyond reasonable limits
-    if (!_disableSanityCheck && transmitList.size() > 128) {
-        panic("Packet queue %s has grown beyond 128 packets\n",
+    if (!_disableSanityCheck && transmitList.size() > 100) {
+        panic("Packet queue %s has grown beyond 100 packets\n",
               name());
     }
 
@@ -232,45 +232,44 @@ PacketQueue::drain()
     }
 }
 
-ReqPacketQueue::ReqPacketQueue(EventManager& _em, RequestPort& _mem_side_port,
+ReqPacketQueue::ReqPacketQueue(EventManager& _em, MasterPort& _masterPort,
                                const std::string _label)
-    : PacketQueue(_em, _label, name(_mem_side_port, _label)),
-      memSidePort(_mem_side_port)
+    : PacketQueue(_em, _label, name(_masterPort, _label)),
+      masterPort(_masterPort)
 {
 }
 
 bool
 ReqPacketQueue::sendTiming(PacketPtr pkt)
 {
-    return memSidePort.sendTimingReq(pkt);
+    return masterPort.sendTimingReq(pkt);
 }
 
 SnoopRespPacketQueue::SnoopRespPacketQueue(EventManager& _em,
-                                           RequestPort& _mem_side_port,
+                                           MasterPort& _masterPort,
                                            bool force_order,
                                            const std::string _label)
-    : PacketQueue(_em, _label, name(_mem_side_port, _label), force_order),
-      memSidePort(_mem_side_port)
+    : PacketQueue(_em, _label, name(_masterPort, _label), force_order),
+      masterPort(_masterPort)
 {
 }
 
 bool
 SnoopRespPacketQueue::sendTiming(PacketPtr pkt)
 {
-    return memSidePort.sendTimingSnoopResp(pkt);
+    return masterPort.sendTimingSnoopResp(pkt);
 }
 
-RespPacketQueue::RespPacketQueue(EventManager& _em,
-                                 ResponsePort& _cpu_side_port,
+RespPacketQueue::RespPacketQueue(EventManager& _em, SlavePort& _slavePort,
                                  bool force_order,
                                  const std::string _label)
-    : PacketQueue(_em, _label, name(_cpu_side_port, _label), force_order),
-      cpuSidePort(_cpu_side_port)
+    : PacketQueue(_em, _label, name(_slavePort, _label), force_order),
+      slavePort(_slavePort)
 {
 }
 
 bool
 RespPacketQueue::sendTiming(PacketPtr pkt)
 {
-    return cpuSidePort.sendTimingResp(pkt);
+    return slavePort.sendTimingResp(pkt);
 }

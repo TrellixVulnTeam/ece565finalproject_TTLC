@@ -91,13 +91,13 @@ setDebugLogger(Logger *logger)
 void
 enable()
 {
-    Debug::Flag::globalEnable();
+    Debug::SimpleFlag::enableAll();
 }
 
 void
 disable()
 {
-    Debug::Flag::globalDisable();
+    Debug::SimpleFlag::disableAll();
 }
 
 ObjectMatch ignore;

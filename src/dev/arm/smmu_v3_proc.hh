@@ -46,7 +46,7 @@
 #include "base/types.hh"
 #include "mem/packet.hh"
 
-class SMMUv3DeviceInterface;
+class SMMUv3SlaveInterface;
 
 /*
  * The meaning of these becomes apparent when you
@@ -67,7 +67,7 @@ struct SMMUAction
 {
     SMMUActionType type;
     PacketPtr pkt;
-    SMMUv3DeviceInterface *ifc;
+    SMMUv3SlaveInterface *ifc;
     Tick delay;
 };
 

@@ -52,7 +52,7 @@
 
 class ClockedObject;
 
-class DmaPort : public RequestPort, public Drainable
+class DmaPort : public MasterPort, public Drainable
 {
   private:
 
@@ -114,7 +114,7 @@ class DmaPort : public RequestPort, public Drainable
     System *const sys;
 
     /** Id for all requests */
-    const RequestorID requestorId;
+    const MasterID masterId;
 
   protected:
     /** Use a deque as we never do any insertion or removal in the middle */

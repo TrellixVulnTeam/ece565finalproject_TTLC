@@ -71,10 +71,10 @@ class MemDelay : public ClockedObject
     Port &getPort(const std::string &if_name,
                   PortID idx=InvalidPortID) override;
 
-    class RequestPort : public QueuedRequestPort
+    class MasterPort : public QueuedMasterPort
     {
       public:
-        RequestPort(const std::string &_name, MemDelay &_parent);
+        MasterPort(const std::string &_name, MemDelay &_parent);
 
       protected:
         bool recvTimingResp(PacketPtr pkt) override;
@@ -86,21 +86,21 @@ class MemDelay : public ClockedObject
         void recvTimingSnoopReq(PacketPtr pkt) override;
 
         void recvRangeChange() override {
-            parent.responsePort.sendRangeChange();
+            parent.slavePort.sendRangeChange();
         }
 
         bool isSnooping() const override {
-            return parent.responsePort.isSnooping();
+            return parent.slavePort.isSnooping();
         }
 
       private:
         MemDelay& parent;
     };
 
-    class ResponsePort : public QueuedResponsePort
+    class SlavePort : public QueuedSlavePort
     {
       public:
-        ResponsePort(const std::string &_name, MemDelay &_parent);
+        SlavePort(const std::string &_name, MemDelay &_parent);
 
       protected:
         Tick recvAtomic(PacketPtr pkt) override;
@@ -109,7 +109,7 @@ class MemDelay : public ClockedObject
         bool recvTimingSnoopResp(PacketPtr pkt) override;
 
         AddrRangeList getAddrRanges() const override {
-            return parent.requestPort.getAddrRanges();
+            return parent.masterPort.getAddrRanges();
         }
 
         bool tryTiming(PacketPtr pkt) override { return true; }
@@ -122,8 +122,8 @@ class MemDelay : public ClockedObject
 
     bool trySatisfyFunctional(PacketPtr pkt);
 
-    RequestPort requestPort;
-    ResponsePort responsePort;
+    MasterPort masterPort;
+    SlavePort slavePort;
 
     ReqPacketQueue reqQueue;
     RespPacketQueue respQueue;

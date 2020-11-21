@@ -64,7 +64,7 @@ BaseTags::BaseTags(const Params *p)
       dataBlks(new uint8_t[p->size]), // Allocate data storage in one big chunk
       stats(*this)
 {
-    registerExitCallback([this]() { cleanupRefs(); });
+    registerExitCallback(new BaseTagsCallback(this));
 }
 
 ReplaceableEntry*
@@ -105,12 +105,12 @@ BaseTags::insertBlock(const PacketPtr pkt, CacheBlk *blk)
     // to insert the new one
 
     // Deal with what we are bringing in
-    RequestorID requestor_id = pkt->req->requestorId();
-    assert(requestor_id < system->maxRequestors());
-    stats.occupancies[requestor_id]++;
+    MasterID master_id = pkt->req->masterId();
+    assert(master_id < system->maxMasters());
+    stats.occupancies[master_id]++;
 
-    // Insert block with tag, src requestor id and task id
-    blk->insert(extractTag(pkt->getAddr()), pkt->isSecure(), requestor_id,
+    // Insert block with tag, src master id and task id
+    blk->insert(extractTag(pkt->getAddr()), pkt->isSecure(), master_id,
                 pkt->req->taskId());
 
     // Check if cache warm up is done
@@ -240,16 +240,16 @@ BaseTags::BaseTagStats::regStats()
     avgRefs = totalRefs / sampledRefs;
 
     occupancies
-        .init(system->maxRequestors())
+        .init(system->maxMasters())
         .flags(nozero | nonan)
         ;
-    for (int i = 0; i < system->maxRequestors(); i++) {
-        occupancies.subname(i, system->getRequestorName(i));
+    for (int i = 0; i < system->maxMasters(); i++) {
+        occupancies.subname(i, system->getMasterName(i));
     }
 
     avgOccs.flags(nozero | total);
-    for (int i = 0; i < system->maxRequestors(); i++) {
-        avgOccs.subname(i, system->getRequestorName(i));
+    for (int i = 0; i < system->maxMasters(); i++) {
+        avgOccs.subname(i, system->getMasterName(i));
     }
 
     avgOccs = occupancies / Stats::constant(tags.numBlocks);

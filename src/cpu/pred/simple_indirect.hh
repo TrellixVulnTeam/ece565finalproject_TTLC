@@ -31,6 +31,7 @@
 
 #include <deque>
 
+#include "arch/isa_traits.hh"
 #include "config/the_isa.hh"
 #include "cpu/inst_seq.hh"
 #include "cpu/pred/indirect.hh"

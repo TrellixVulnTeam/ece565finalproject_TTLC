@@ -54,9 +54,9 @@ class SimObject;
 /**
  * The simple timing port uses a queued port to implement
  * recvFunctional and recvTimingReq through recvAtomic. It is always a
- * response port.
+ * slave port.
  */
-class SimpleTimingPort : public QueuedResponsePort
+class SimpleTimingPort : public QueuedSlavePort
 {
 
   private:
@@ -64,7 +64,7 @@ class SimpleTimingPort : public QueuedResponsePort
     /**
      * The packet queue used to store outgoing responses. Note that
      * the queue is made private and that we avoid overloading the
-     * name used in the QueuedResponsePort. Access is provided through
+     * name used in the QueuedSlavePort. Access is provided through
      * the queue reference in the base class.
      */
     RespPacketQueue queueImpl;

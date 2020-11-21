@@ -56,7 +56,7 @@
 
 struct HSADriverParams;
 class HSADevice;
-class PortProxy;
+class SETranslatingPortProxy;
 class ThreadContext;
 
 class HSADriver : public EmulatedDriver
@@ -74,7 +74,8 @@ class HSADriver : public EmulatedDriver
     HSADevice *device;
     uint32_t queueId;
 
-    void allocateQueue(ThreadContext *tc, Addr ioc_buf);
+    void allocateQueue(const SETranslatingPortProxy &mem_proxy,
+                       Addr ioc_buf_addr);
 };
 
 #endif // __DEV_HSA_HSA_DRIVER_HH__

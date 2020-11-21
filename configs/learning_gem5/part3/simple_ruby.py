@@ -68,9 +68,8 @@ system.mem_ranges = [AddrRange('512MB')] # Create an address range
 system.cpu = [TimingSimpleCPU() for i in range(2)]
 
 # Create a DDR3 memory controller and connect it to the membus
-system.mem_ctrl = MemCtrl()
-system.mem_ctrl.dram = DDR3_1600_8x8()
-system.mem_ctrl.dram.range = system.mem_ranges[0]
+system.mem_ctrl = DDR3_1600_8x8()
+system.mem_ctrl.range = system.mem_ranges[0]
 
 # create the interrupt controller for the CPU and connect to the membus
 for cpu in system.cpu:
@@ -88,8 +87,6 @@ isa = str(m5.defines.buildEnv['TARGET_ISA']).lower()
 thispath = os.path.dirname(os.path.realpath(__file__))
 binary = os.path.join(thispath, '../../../', 'tests/test-progs/threads/bin/',
                       isa, 'linux/threads')
-
-system.workload = SEWorkload()
 
 # Create a process for a simple "multi-threaded" application
 process = Process()

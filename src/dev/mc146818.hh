@@ -31,8 +31,7 @@
 
 #include "base/bitunion.hh"
 #include "base/logging.hh"
-#include "sim/core.hh"
-#include "sim/eventq.hh"
+#include "sim/eventq_impl.hh"
 
 /** Real-Time Clock (MC146818) */
 class MC146818 : public EventManager

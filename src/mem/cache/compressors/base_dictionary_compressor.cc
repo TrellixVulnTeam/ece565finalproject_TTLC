@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018-2020 Inria
+ * Copyright (c) 2018-2019 Inria
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -34,35 +34,26 @@
 #include "mem/cache/compressors/dictionary_compressor.hh"
 #include "params/BaseDictionaryCompressor.hh"
 
-namespace Compressor {
-
 BaseDictionaryCompressor::BaseDictionaryCompressor(const Params *p)
-  : Base(p), dictionarySize(p->dictionary_size),
-    numEntries(0), dictionaryStats(stats, *this)
-{
-}
-
-BaseDictionaryCompressor::DictionaryStats::DictionaryStats(
-    BaseStats& base_group, BaseDictionaryCompressor& _compressor)
-  : Stats::Group(&base_group), compressor(_compressor),
-    patterns(this, "pattern",
-        "Number of data entries that were compressed to this pattern")
+    : BaseCacheCompressor(p), dictionarySize(p->dictionary_size), numEntries(0)
 {
 }
 
 void
-BaseDictionaryCompressor::DictionaryStats::regStats()
+BaseDictionaryCompressor::regStats()
 {
-    Stats::Group::regStats();
+    BaseCacheCompressor::regStats();
 
     // We store the frequency of each pattern
-    patterns.init(compressor.getNumPatterns());
-    for (unsigned i = 0; i < compressor.getNumPatterns(); ++i) {
-        const std::string name = compressor.getName(i);
-        patterns.subname(i, name);
-        patterns.subdesc(i, "Number of data entries that match pattern " +
-            name);
+    patternStats
+        .init(getNumPatterns())
+        .name(name() + ".pattern")
+        .desc("Number of data entries that were compressed to this pattern.")
+        ;
+
+    for (unsigned i = 0; i < getNumPatterns(); ++i) {
+        patternStats.subname(i, getName(i));
+        patternStats.subdesc(i, "Number of data entries that match pattern " +
+                                getName(i));
     }
 }
-
-} // namespace Compressor

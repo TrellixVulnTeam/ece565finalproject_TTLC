@@ -45,6 +45,7 @@
 #include <list>
 #include <string>
 
+#include "arch/isa_traits.hh"
 #include "base/refcnt.hh"
 #include "config/the_isa.hh"
 #include "cpu/base_dyn_inst.hh"
@@ -237,11 +238,11 @@ Checker<Impl>::verify(const DynInstPtr &completed_inst)
             if (!curMacroStaticInst) {
                 // set up memory request for instruction fetch
                 auto mem_req = std::make_shared<Request>(
-                    fetch_PC, sizeof(MachInst), 0, requestorId, fetch_PC,
+                    fetch_PC, sizeof(MachInst), 0, masterId, fetch_PC,
                     thread->contextId());
 
                 mem_req->setVirt(fetch_PC, sizeof(MachInst),
-                                 Request::INST_FETCH, requestorId,
+                                 Request::INST_FETCH, masterId,
                                  thread->instAddr());
 
                 fault = itb->translateFunctional(
@@ -286,8 +287,8 @@ Checker<Impl>::verify(const DynInstPtr &completed_inst)
 
                 if (isRomMicroPC(pcState.microPC())) {
                     fetchDone = true;
-                    curStaticInst = thread->decoder.fetchRomMicroop(
-                            pcState.microPC(), nullptr);
+                    curStaticInst =
+                        microcodeRom.fetchMicroop(pcState.microPC(), NULL);
                 } else if (!curMacroStaticInst) {
                     //We're not in the middle of a macro instruction
                     StaticInstPtr instPtr = nullptr;

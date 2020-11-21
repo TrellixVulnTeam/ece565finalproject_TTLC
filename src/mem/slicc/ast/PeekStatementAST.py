@@ -61,7 +61,7 @@ class PeekStatementAST(StatementAST):
         code('''
 {
     // Declare message
-    M5_VAR_USED const $mtid* in_msg_ptr;
+    const $mtid* in_msg_ptr M5_VAR_USED;
     in_msg_ptr = dynamic_cast<const $mtid *>(($qcode).${{self.method}}());
     if (in_msg_ptr == NULL) {
         // If the cast fails, this is the wrong inport (wrong message type).

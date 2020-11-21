@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018-2020 ARM Limited
+ * Copyright (c) 2018 ARM Limited
  * All rights reserved
  *
  * The license below extends only to copyright in the software and shall
@@ -41,13 +41,9 @@
 #ifndef __MEM_QOS_MEM_SINK_HH__
 #define __MEM_QOS_MEM_SINK_HH__
 
-#include "mem/abstract_mem.hh"
 #include "mem/qos/mem_ctrl.hh"
 #include "mem/qport.hh"
 #include "params/QoSMemSinkCtrl.hh"
-
-class QoSMemSinkInterfaceParams;
-class QoSMemSinkInterface;
 
 namespace QoS {
 
@@ -68,7 +64,7 @@ class MemSinkCtrl : public MemCtrl
     using PacketQueue = std::deque<PacketPtr>;
 
   private:
-    class MemoryPort : public QueuedResponsePort
+    class MemoryPort : public QueuedSlavePort
     {
       private:
         /** reference to parent memory object */
@@ -135,11 +131,11 @@ class MemSinkCtrl : public MemCtrl
     DrainState drain() override;
 
     /**
-     * Getter method to access this memory's response port
+     * Getter method to access this memory's slave port
      *
      * @param if_name interface name
      * @param idx port ID number
-     * @return reference to this memory's response port
+     * @return reference to this memory's slave port
      */
     Port &getPort(const std::string &if_name, PortID=InvalidPortID) override;
 
@@ -164,13 +160,8 @@ class MemSinkCtrl : public MemCtrl
     /** Write request packets queue buffer size in #packets */
     const uint64_t writeBufferSize;
 
-    /** Memory response port */
+    /** Memory slave port */
     MemoryPort port;
-
-    /**
-     * Create pointer to interface of actual media
-     */
-    QoSMemSinkInterface* const interface;
 
     /** Read request pending */
     bool retryRdReq;
@@ -252,18 +243,5 @@ class MemSinkCtrl : public MemCtrl
 };
 
 } // namespace QoS
-
-class QoSMemSinkInterface : public AbstractMemory
-{
-  public:
-    /** Setting a pointer to the interface */
-    void setMemCtrl(QoS::MemSinkCtrl* _ctrl) { ctrl = _ctrl; };
-
-    /** Pointer to the controller */
-    QoS::MemSinkCtrl* ctrl;
-
-    QoSMemSinkInterface(const QoSMemSinkInterfaceParams* _p);
-};
-
 
 #endif /* __MEM_QOS_MEM_SINK_HH__ */

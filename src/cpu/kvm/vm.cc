@@ -294,7 +294,6 @@ KvmVM::KvmVM(KvmVMParams *params)
       kvm(new Kvm()), system(nullptr),
       vmFD(kvm->createVM()),
       started(false),
-      _hasKernelIRQChip(false),
       nextVCPUID(0)
 {
     maxMemorySlot = kvm->capNumMemSlots();
@@ -540,7 +539,7 @@ KvmVM::contextIdToVCpuId(ContextID ctx) const
 {
     assert(system != nullptr);
     return dynamic_cast<BaseKvmCPU*>
-        (system->threads[ctx]->getCpuPtr())->getVCpuID();
+        (system->getThreadContext(ctx)->getCpuPtr())->getVCpuID();
 }
 
 int

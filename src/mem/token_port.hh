@@ -38,33 +38,33 @@
 #include "sim/clocked_object.hh"
 
 class TokenManager;
-class TokenResponsePort;
+class TokenSlavePort;
 
-class TokenRequestPort : public RequestPort
+class TokenMasterPort : public MasterPort
 {
   private:
     /* Manager to track tokens between this token port pair. */
     TokenManager *tokenManager;
 
   public:
-    TokenRequestPort(const std::string& name, SimObject* owner,
+    TokenMasterPort(const std::string& name, SimObject* owner,
                     PortID id = InvalidPortID) :
-        RequestPort(name, owner, id), tokenManager(nullptr)
+        MasterPort(name, owner, id), tokenManager(nullptr)
     { }
 
     /**
-     * Bind this request port to response port. Called by the response port in
+     * Bind this master port to slave port. Called by the slave port in
      * this token implementation.
      */
     void bind(Port &peer) override;
 
     /**
-     * Unbind port. Handled by response port in token implementation.
+     * Unbind port. Handled by slave port in token implementation.
      */
     void unbind() override {}
 
     /**
-     * Receive tokens returned by the response port. This increments the number
+     * Receive tokens returned by the slave port. This increments the number
      * or available tokens across the port.
      */
     void recvTokens(int num_tokens);
@@ -82,41 +82,41 @@ class TokenRequestPort : public RequestPort
 
     /**
      * Specify a token manger, which will handle tracking of tokens for a
-     * TokenRequestPort/ResponseRequestPort pair.
+     * TokenMasterPort/SlaveMasterPort pair.
      */
     void setTokenManager(TokenManager *_tokenManager);
 };
 
-class TokenResponsePort : public ResponsePort
+class TokenSlavePort : public SlavePort
 {
   private:
-    TokenRequestPort *tokenRequestPort;
+    TokenMasterPort *tokenMasterPort;
 
     std::deque<PacketPtr> respQueue;
 
     void recvRespRetry() override;
 
   public:
-    TokenResponsePort(const std::string& name, ClockedObject *owner,
+    TokenSlavePort(const std::string& name, ClockedObject *owner,
                    PortID id = InvalidPortID) :
-        ResponsePort(name, owner, id), tokenRequestPort(nullptr)
+        SlavePort(name, owner, id), tokenMasterPort(nullptr)
     { }
-    ~TokenResponsePort() { }
+    ~TokenSlavePort() { }
 
     /**
-     * Bind this response port to a request port. This also does the mirror
-     * action and binds the request port to the response port as well as
+     * Bind this slave port to a master port. This also does the mirror
+     * action and bainds the master port to the slave port as well as
      * binding the base class types.
      */
     void bind(Port &peer) override;
 
     /**
-     * Unbind this response port and associated request port.
+     * Unbind this slave port and associated master port.
      */
     void unbind() override;
 
     /**
-     * Return num_tokens tokens back to the request port.
+     * Return num_tokens tokens back to the master port.
      */
     void sendTokens(int num_tokens);
 

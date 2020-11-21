@@ -54,6 +54,8 @@ class MmioVirtIO(BasicPioDevice):
 
     def generateDeviceTree(self, state):
         node = self.generateBasicPioDeviceNode(state, 'virtio', self.pio_addr,
-            int(self.pio_size), [ self.interrupt ])
+                                               int(self.pio_size), [
+                                                   int(self.interrupt.num),
+                                               ])
         node.appendCompatible(["virtio,mmio"])
         yield node

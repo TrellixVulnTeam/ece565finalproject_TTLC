@@ -28,6 +28,7 @@
 
 #include "arch/sparc/interrupts.hh"
 #include "arch/sparc/isa.hh"
+#include "arch/sparc/kernel_stats.hh"
 #include "arch/sparc/registers.hh"
 #include "base/bitfield.hh"
 #include "base/trace.hh"
@@ -35,6 +36,7 @@
 #include "cpu/thread_context.hh"
 #include "debug/Quiesce.hh"
 #include "debug/Timer.hh"
+#include "sim/full_system.hh"
 #include "sim/system.hh"
 
 using namespace SparcISA;
@@ -42,7 +44,7 @@ using namespace std;
 
 
 void
-ISA::checkSoftInt()
+ISA::checkSoftInt(ThreadContext *tc)
 {
     BaseCPU *cpu = tc->getCpuPtr();
 
@@ -87,7 +89,7 @@ getMiscRegName(RegIndex index)
 }
 
 void
-ISA::setFSReg(int miscReg, RegVal val)
+ISA::setFSReg(int miscReg, RegVal val, ThreadContext *tc)
 {
     BaseCPU *cpu = tc->getCpuPtr();
 
@@ -95,17 +97,17 @@ ISA::setFSReg(int miscReg, RegVal val)
     switch (miscReg) {
         /* Full system only ASRs */
       case MISCREG_SOFTINT:
-        setMiscRegNoEffect(miscReg, val);
-        checkSoftInt();
+        setMiscRegNoEffect(miscReg, val);;
+        checkSoftInt(tc);
         break;
       case MISCREG_SOFTINT_CLR:
-        return setMiscReg(MISCREG_SOFTINT, ~val & softint);
+        return setMiscReg(MISCREG_SOFTINT, ~val & softint, tc);
       case MISCREG_SOFTINT_SET:
-        return setMiscReg(MISCREG_SOFTINT, val | softint);
+        return setMiscReg(MISCREG_SOFTINT, val | softint, tc);
 
       case MISCREG_TICK_CMPR:
         if (tickCompare == NULL)
-            tickCompare = new TickCompareEvent(this);
+            tickCompare = new TickCompareEvent(this, tc);
         setMiscRegNoEffect(miscReg, val);
         if ((tick_cmpr & ~mask(63)) && tickCompare->scheduled())
             cpu->deschedule(tickCompare);
@@ -120,7 +122,7 @@ ISA::setFSReg(int miscReg, RegVal val)
 
       case MISCREG_STICK_CMPR:
         if (sTickCompare == NULL)
-            sTickCompare = new STickCompareEvent(this);
+            sTickCompare = new STickCompareEvent(this, tc);
         setMiscRegNoEffect(miscReg, val);
         if ((stick_cmpr & ~mask(63)) && sTickCompare->scheduled())
             cpu->deschedule(sTickCompare);
@@ -140,7 +142,7 @@ ISA::setFSReg(int miscReg, RegVal val)
 
       case MISCREG_PIL:
         setMiscRegNoEffect(miscReg, val);
-        checkSoftInt();
+        checkSoftInt(tc);
         break;
 
       case MISCREG_HVER:
@@ -191,7 +193,7 @@ ISA::setFSReg(int miscReg, RegVal val)
 
       case MISCREG_HSTICK_CMPR:
         if (hSTickCompare == NULL)
-            hSTickCompare = new HSTickCompareEvent(this);
+            hSTickCompare = new HSTickCompareEvent(this, tc);
         setMiscRegNoEffect(miscReg, val);
         if ((hstick_cmpr & ~mask(63)) && hSTickCompare->scheduled())
             cpu->deschedule(hSTickCompare);
@@ -230,9 +232,8 @@ ISA::setFSReg(int miscReg, RegVal val)
             DPRINTF(Quiesce, "Cpu executed quiescing instruction\n");
             // Time to go to sleep
             tc->suspend();
-            auto *workload = tc->getSystemPtr()->workload;
-            if (workload)
-                workload->recordQuiesce();
+            if (FullSystem && tc->getKernelStats())
+                tc->getKernelStats()->quiesce();
         }
         break;
 
@@ -243,7 +244,7 @@ ISA::setFSReg(int miscReg, RegVal val)
 }
 
 RegVal
-ISA::readFSReg(int miscReg)
+ISA::readFSReg(int miscReg, ThreadContext * tc)
 {
     uint64_t temp;
 
@@ -286,12 +287,12 @@ ISA::readFSReg(int miscReg)
         temp = readMiscRegNoEffect(miscReg) & (STS::active | STS::speculative);
         // Check that the CPU array is fully populated
         // (by calling getNumCPus())
-        assert(sys->threads.size() > tc->contextId());
+        assert(sys->numContexts() > tc->contextId());
 
         temp |= tc->contextId()  << STS::shft_id;
 
-        for (x = tc->contextId() & ~3; x < sys->threads.size(); x++) {
-            switch (sys->threads[x]->status()) {
+        for (x = tc->contextId() & ~3; x < sys->threadContexts.size(); x++) {
+            switch (sys->threadContexts[x]->status()) {
               case ThreadContext::Active:
                 temp |= STS::st_run << (STS::shft_fsm0 -
                         ((x & 0x3) * (STS::shft_fsm0-STS::shft_fsm1)));
@@ -317,13 +318,13 @@ ISA::readFSReg(int miscReg)
 }
 
 void
-ISA::processTickCompare()
+ISA::processTickCompare(ThreadContext *tc)
 {
     panic("tick compare not implemented\n");
 }
 
 void
-ISA::processSTickCompare()
+ISA::processSTickCompare(ThreadContext *tc)
 {
     BaseCPU *cpu = tc->getCpuPtr();
 
@@ -339,7 +340,7 @@ ISA::processSTickCompare()
         DPRINTF(Timer, "STick compare cycle reached at %#x\n",
                 (stick_cmpr & mask(63)));
         if (!(tc->readMiscRegNoEffect(MISCREG_STICK_CMPR) & (ULL(1) << 63))) {
-            setMiscReg(MISCREG_SOFTINT, softint | (ULL(1) << 16));
+            setMiscReg(MISCREG_SOFTINT, softint | (ULL(1) << 16), tc);
         }
     } else {
         cpu->schedule(sTickCompare, cpu->clockEdge(Cycles(delay)));
@@ -347,7 +348,7 @@ ISA::processSTickCompare()
 }
 
 void
-ISA::processHSTickCompare()
+ISA::processHSTickCompare(ThreadContext *tc)
 {
     BaseCPU *cpu = tc->getCpuPtr();
 
@@ -366,7 +367,7 @@ ISA::processHSTickCompare()
         DPRINTF(Timer, "HSTick compare cycle reached at %#x\n",
                 (stick_cmpr & mask(63)));
         if (!(tc->readMiscRegNoEffect(MISCREG_HSTICK_CMPR) & (ULL(1) << 63))) {
-            setMiscReg(MISCREG_HINTP, 1);
+            setMiscReg(MISCREG_HINTP, 1, tc);
         }
         // Need to do something to cause interrupt to happen here !!! @todo
     } else {

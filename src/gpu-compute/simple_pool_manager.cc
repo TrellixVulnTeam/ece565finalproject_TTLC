@@ -35,12 +35,6 @@
 
 #include "base/logging.hh"
 
-SimplePoolManager *
-SimplePoolManagerParams::create()
-{
-    return new SimplePoolManager(this);
-}
-
 // return the min number of elements that the manager can reserve given
 // a request for "size" elements
 uint32_t
@@ -70,6 +64,8 @@ SimplePoolManager::printRegion()
 bool
 SimplePoolManager::canAllocate(uint32_t numRegions, uint32_t size)
 {
+    assert(numRegions * minAllocatedElements(size) <= poolSize());
+
     return _reservedGroups == 0;
 }
 

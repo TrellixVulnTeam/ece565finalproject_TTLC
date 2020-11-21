@@ -29,8 +29,6 @@
 
 #include "sim/global_event.hh"
 
-#include "sim/core.hh"
-
 std::mutex BaseGlobalEvent::globalQMutex;
 
 BaseGlobalEvent::BaseGlobalEvent(Priority p, Flags f)

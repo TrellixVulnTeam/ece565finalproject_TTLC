@@ -44,8 +44,6 @@
  *
  * @tparam Key Type of the key of the tree nodes. Must be an integral type.
  * @tparam Value Type of the values associated to the keys.
- *
- * @ingroup api_base_utils
  */
 template <class Key, class Value>
 class Trie
@@ -116,20 +114,11 @@ class Trie
     Node head;
 
   public:
-    /**
-     * @ingroup api_base_utils
-     */
     typedef Node *Handle;
 
-    /**
-     * @ingroup api_base_utils
-     */
     Trie() : head(0, 0, NULL)
     {}
 
-    /**
-     * @ingroup api_base_utils
-     */
     static const unsigned MaxBits = sizeof(Key) * 8;
 
   private:
@@ -203,8 +192,6 @@ class Trie
      * @param width How many bits of the key (from msb) should be used.
      * @param val A pointer to the value to store in the trie.
      * @return A Handle corresponding to this value.
-     *
-     * @ingroup api_base_utils
      */
     Handle
     insert(Key key, unsigned width, Value *val)
@@ -291,8 +278,6 @@ class Trie
      * Method which looks up the Value corresponding to a particular key.
      * @param key The key to look up.
      * @return The first Value matching this key, or NULL if none was found.
-     *
-     * @ingroup api_base_utils
      */
     Value *
     lookup(Key key)
@@ -308,8 +293,6 @@ class Trie
      * Method to delete a value from the trie.
      * @param node A Handle to remove.
      * @return The Value pointer from the removed entry.
-     *
-     * @ingroup api_base_utils
      */
     Value *
     remove(Handle handle)
@@ -354,8 +337,6 @@ class Trie
      * Method to lookup a value from the trie and then delete it.
      * @param key The key to look up and then remove.
      * @return The Value pointer from the removed entry, if any.
-     *
-     * @ingroup api_base_utils
      */
     Value *
     remove(Key key)
@@ -369,8 +350,6 @@ class Trie
     /**
      * A method which removes all key/value pairs from the trie. This is more
      * efficient than trying to remove elements individually.
-     *
-     * @ingroup api_base_utils
      */
     void
     clear()

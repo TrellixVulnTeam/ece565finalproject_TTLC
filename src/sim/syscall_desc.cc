@@ -35,7 +35,7 @@
 class ThreadContext;
 
 void
-SyscallDesc::doSyscall(ThreadContext *tc)
+SyscallDesc::doSyscall(ThreadContext *tc, Fault *fault)
 {
     DPRINTF_SYSCALL(Base, "Calling %s...\n", dumper(name(), tc));
 

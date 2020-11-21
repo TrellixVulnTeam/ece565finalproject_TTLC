@@ -17,7 +17,7 @@ struct Chan: i_f, sc_object
   sc_event ev;
 };
 
-struct SCPort: sc_port<i_f,0>
+struct Port: sc_port<i_f,0>
 {
   sc_event_finder& find_event() const
   {
@@ -27,7 +27,7 @@ struct SCPort: sc_port<i_f,0>
 
 SC_MODULE(M)
 {
-  SCPort mp;
+  Port mp;
   bool flag, flag2;
 
   SC_CTOR(M)

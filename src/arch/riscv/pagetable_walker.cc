@@ -396,7 +396,7 @@ Walker::WalkerState::stepWalk(PacketPtr &write)
     else {
         //If we didn't return, we're setting up another read.
         RequestPtr request = std::make_shared<Request>(
-            nextRead, oldRead->getSize(), flags, walker->requestorId);
+            nextRead, oldRead->getSize(), flags, walker->masterId);
         read = new Packet(request, MemCmd::ReadReq);
         read->allocate();
 
@@ -435,7 +435,7 @@ Walker::WalkerState::setupWalk(Addr vaddr)
 
     Request::Flags flags = Request::PHYSICAL;
     RequestPtr request = std::make_shared<Request>(
-        topAddr, sizeof(PTESv39), flags, walker->requestorId);
+        topAddr, sizeof(PTESv39), flags, walker->masterId);
 
     read = new Packet(request, MemCmd::ReadReq);
     read->allocate();

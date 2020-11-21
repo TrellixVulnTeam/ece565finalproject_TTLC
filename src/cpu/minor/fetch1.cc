@@ -168,7 +168,7 @@ Fetch1::fetchLine(ThreadID tid)
 
     request->request->setContext(cpu.threads[tid]->getTC()->contextId());
     request->request->setVirt(
-        aligned_pc, request_size, Request::INST_FETCH, cpu.instRequestorId(),
+        aligned_pc, request_size, Request::INST_FETCH, cpu.instMasterId(),
         /* I've no idea why we need the PC, but give it */
         thread.pc.instAddr());
 
@@ -388,7 +388,7 @@ void
 Fetch1::minorTraceResponseLine(const std::string &name,
     Fetch1::FetchRequestPtr response) const
 {
-    M5_VAR_USED const RequestPtr &request = response->request;
+    const RequestPtr &request M5_VAR_USED = response->request;
 
     if (response->packet && response->packet->isError()) {
         MINORLINE(this, "id=F;%s vaddr=0x%x fault=\"error packet\"\n",

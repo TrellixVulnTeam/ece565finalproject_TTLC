@@ -82,7 +82,9 @@ MemFootprintProbe::regStats()
         .flags(nozero | nonan);
     // clang-format on
 
-    registerResetCallback([this]() { statReset(); });
+    registerResetCallback(
+        new MakeCallback<MemFootprintProbe, &MemFootprintProbe::statReset>(
+            this));
 }
 
 void

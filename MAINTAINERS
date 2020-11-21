@@ -29,6 +29,7 @@ arch-arm:
   Andreas Sandberg <andreas.sandberg@arm.com>
   Giacomo Travaglini <giacomo.travaglini@arm.com>
 arch-gcn3:
+arch-hsail:
   Tony Gutierrez <anthony.gutierrez@amd.com>
 arch-mips:
 arch-power:
@@ -68,7 +69,6 @@ fastmodel: Changes relating to ARM Fast Models
 
 gpu-compute:
   Tony Gutierrez <anthony.gutierrez@amd.com>
-  Matt Poremba <matthew.poremba@amd.com>
 
 learning-gem5: The code and configs for the Learning gem5 book (see
                learning.gem5.com)
@@ -102,6 +102,7 @@ sim-power: Power modeling
 stats: Updates to statistics for regressions
 
 system: System boot code and related components
+system-alpha:
 system-arm:
   Andreas Sandberg <andreas.sandberg@arm.com>
   Giacomo Travaglini <giacomo.travaglini@arm.com>

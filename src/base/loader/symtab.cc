@@ -35,7 +35,6 @@
 
 #include "base/logging.hh"
 #include "base/str.hh"
-#include "base/trace.hh"
 #include "base/types.hh"
 #include "sim/serialize.hh"
 
@@ -44,53 +43,31 @@ using namespace std;
 namespace Loader
 {
 
-SymbolTable debugSymbolTable;
+SymbolTable *debugSymbolTable = NULL;
 
 void
 SymbolTable::clear()
 {
-    addrMap.clear();
-    nameMap.clear();
-    symbols.clear();
+    addrTable.clear();
+    symbolTable.clear();
 }
 
 bool
-SymbolTable::insert(const Symbol &symbol)
+SymbolTable::insert(Addr address, string symbol)
 {
-    if (symbol.name.empty())
+    if (symbol.empty())
         return false;
 
-    int idx = symbols.size();
-
-    if (!nameMap.insert({ symbol.name, idx }).second)
+    if (!symbolTable.insert(make_pair(symbol, address)).second)
         return false;
 
     // There can be multiple symbols for the same address, so always
     // update the addrTable multimap when we see a new symbol name.
-    addrMap.insert({ symbol.address, idx });
-
-    symbols.emplace_back(symbol);
+    addrTable.insert(make_pair(address, symbol));
 
     return true;
 }
 
-bool
-SymbolTable::insert(const SymbolTable &other)
-{
-    // Check if any symbol in other already exists in our table.
-    NameMap intersection;
-    std::set_intersection(other.nameMap.begin(), other.nameMap.end(),
-                          nameMap.begin(), nameMap.end(),
-                          std::inserter(intersection, intersection.begin()),
-                          nameMap.value_comp());
-    if (!intersection.empty())
-        return false;
-
-    for (const Symbol &symbol: other)
-        insert(symbol);
-
-    return true;
-}
 
 bool
 SymbolTable::load(const string &filename)
@@ -115,54 +92,51 @@ SymbolTable::load(const string &filename)
         if (address.empty())
             return false;
 
-        string name = buffer.substr(idx + 1);
-        eat_white(name);
-        if (name.empty())
+        string symbol = buffer.substr(idx + 1);
+        eat_white(symbol);
+        if (symbol.empty())
             return false;
 
         Addr addr;
         if (!to_number(address, addr))
             return false;
 
-        if (!insert({ Symbol::Binding::Global, name, addr }))
+        if (!insert(addr, symbol))
             return false;
     }
 
     file.close();
+
     return true;
 }
 
 void
 SymbolTable::serialize(const string &base, CheckpointOut &cp) const
 {
-    paramOut(cp, base + ".size", symbols.size());
+    paramOut(cp, base + ".size", addrTable.size());
 
     int i = 0;
-    for (auto &symbol: symbols) {
-        paramOut(cp, csprintf("%s.addr_%d", base, i), symbol.address);
-        paramOut(cp, csprintf("%s.symbol_%d", base, i), symbol.name);
-        paramOut(cp, csprintf("%s.binding_%d", base, i), (int)symbol.binding);
-        i++;
+    ATable::const_iterator p, end = addrTable.end();
+    for (p = addrTable.begin(); p != end; ++p) {
+        paramOut(cp, csprintf("%s.addr_%d", base, i), p->first);
+        paramOut(cp, csprintf("%s.symbol_%d", base, i), p->second);
+        ++i;
     }
 }
 
 void
-SymbolTable::unserialize(const string &base, CheckpointIn &cp,
-                         Symbol::Binding default_binding)
+SymbolTable::unserialize(const string &base, CheckpointIn &cp)
 {
     clear();
     int size;
     paramIn(cp, base + ".size", size);
     for (int i = 0; i < size; ++i) {
-        Addr address;
-        std::string name;
-        Symbol::Binding binding = default_binding;
+        Addr addr;
+        std::string symbol;
 
-        paramIn(cp, csprintf("%s.addr_%d", base, i), address);
-        paramIn(cp, csprintf("%s.symbol_%d", base, i), name);
-        if (!optParamIn(cp, csprintf("%s.binding_%d", base, i), binding))
-            binding = default_binding;
-        insert({binding, name, address});
+        paramIn(cp, csprintf("%s.addr_%d", base, i), addr);
+        paramIn(cp, csprintf("%s.symbol_%d", base, i), symbol);
+        insert(addr, symbol);
     }
 }
 

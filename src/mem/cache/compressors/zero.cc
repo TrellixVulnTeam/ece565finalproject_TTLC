@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019-2020 Inria
+ * Copyright (c) 2019 Inria
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -33,31 +33,28 @@
 
 #include "mem/cache/compressors/zero.hh"
 
-#include "base/trace.hh"
 #include "debug/CacheComp.hh"
 #include "mem/cache/compressors/dictionary_compressor_impl.hh"
 #include "params/ZeroCompressor.hh"
 
-namespace Compressor {
-
-Zero::Zero(const Params *p)
+ZeroCompressor::ZeroCompressor(const Params *p)
     : DictionaryCompressor<uint64_t>(p)
 {
 }
 
 void
-Zero::addToDictionary(DictionaryEntry data)
+ZeroCompressor::addToDictionary(DictionaryEntry data)
 {
     assert(numEntries < dictionarySize);
     dictionary[numEntries++] = data;
 }
 
-std::unique_ptr<Base::CompressionData>
-Zero::compress(const std::vector<Chunk>& chunks, Cycles& comp_lat,
+std::unique_ptr<BaseCacheCompressor::CompressionData>
+ZeroCompressor::compress(const uint64_t* data, Cycles& comp_lat,
     Cycles& decomp_lat)
 {
-    std::unique_ptr<Base::CompressionData> comp_data =
-        DictionaryCompressor::compress(chunks);
+    std::unique_ptr<BaseCacheCompressor::CompressionData> comp_data =
+        DictionaryCompressor::compress(data);
 
     // If there is any non-zero entry, the compressor failed
     if (numEntries > 0) {
@@ -75,10 +72,8 @@ Zero::compress(const std::vector<Chunk>& chunks, Cycles& comp_lat,
     return comp_data;
 }
 
-} // namespace Compressor
-
-Compressor::Zero*
+ZeroCompressor*
 ZeroCompressorParams::create()
 {
-    return new Compressor::Zero(this);
+    return new ZeroCompressor(this);
 }

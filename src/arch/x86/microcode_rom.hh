@@ -35,46 +35,41 @@
 
 namespace X86ISAInst
 {
-
-class MicrocodeRom
-{
-  protected:
-
-    typedef StaticInstPtr (*GenFunc)(StaticInstPtr);
-
-    static const MicroPC numMicroops;
-
-    GenFunc *genFuncs;
-
-  public:
-    //Constructor.
-    MicrocodeRom();
-
-    //Destructor.
-    ~MicrocodeRom()
+    class MicrocodeRom
     {
-        delete [] genFuncs;
-    }
+      protected:
 
-    StaticInstPtr
-    fetchMicroop(MicroPC microPC, StaticInstPtr curMacroop)
-    {
-        microPC = normalMicroPC(microPC);
-        if (microPC >= numMicroops)
-            return X86ISA::badMicroop;
-        else
-            return genFuncs[microPC](curMacroop);
-    }
-};
+        typedef StaticInstPtr (*GenFunc)(StaticInstPtr);
 
-} // namespace X86ISAInst
+        static const MicroPC numMicroops;
+
+        GenFunc * genFuncs;
+
+      public:
+        //Constructor.
+        MicrocodeRom();
+
+        //Destructor.
+        ~MicrocodeRom()
+        {
+            delete [] genFuncs;
+        }
+
+        StaticInstPtr
+        fetchMicroop(MicroPC microPC, StaticInstPtr curMacroop)
+        {
+            microPC = normalMicroPC(microPC);
+            if (microPC >= numMicroops)
+                return X86ISA::badMicroop;
+            else
+                return genFuncs[microPC](curMacroop);
+        }
+    };
+}
 
 namespace X86ISA
 {
-
-using X86ISAInst::MicrocodeRom;
-
+    using X86ISAInst::MicrocodeRom;
 }
-
 
 #endif // __ARCH_X86_MICROCODE_ROM_HH__

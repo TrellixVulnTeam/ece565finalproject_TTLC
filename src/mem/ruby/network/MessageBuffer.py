@@ -40,7 +40,5 @@ class MessageBuffer(SimObject):
                                        random delays if RubySystem \
                                        randomization flag is True)")
 
-    out_port = RequestPort("Request port to MessageBuffer receiver")
-    master = DeprecatedParam(out_port, '`master` is now called `out_port`')
-    in_port = ResponsePort("Response port from MessageBuffer sender")
-    slave = DeprecatedParam(in_port, '`slave` is now called `in_port`')
+    master = MasterPort("Master port to MessageBuffer receiver")
+    slave = SlavePort("Slave port from MessageBuffer sender")

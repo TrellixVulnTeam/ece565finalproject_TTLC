@@ -66,8 +66,7 @@ class BaseCPU;
 
 int divideFromConf(uint32_t conf);
 
-namespace X86ISA
-{
+namespace X86ISA {
 
 ApicRegIndex decodeAddr(Addr paddr);
 
@@ -171,11 +170,13 @@ class Interrupts : public BaseInterrupts
 
     void requestInterrupt(uint8_t vector, uint8_t deliveryMode, bool level);
 
+    BaseCPU *cpu;
+
     int initialApicId;
 
     // Ports for interrupts.
-    IntResponsePort<Interrupts> intResponsePort;
-    IntRequestPort<Interrupts> intRequestPort;
+    IntSlavePort<Interrupts> intSlavePort;
+    IntMasterPort<Interrupts> intMasterPort;
 
     // Port for memory mapped register accesses.
     PioPort<Interrupts> pioPort;
@@ -192,7 +193,7 @@ class Interrupts : public BaseInterrupts
      */
     typedef X86LocalApicParams Params;
 
-    void setThreadContext(ThreadContext *_tc) override;
+    void setCPU(BaseCPU * newCPU) override;
 
     const Params *
     params() const
@@ -228,10 +229,10 @@ class Interrupts : public BaseInterrupts
     Port &getPort(const std::string &if_name,
                   PortID idx=InvalidPortID) override
     {
-        if (if_name == "int_requestor") {
-            return intRequestPort;
-        } else if (if_name == "int_responder") {
-            return intResponsePort;
+        if (if_name == "int_master") {
+            return intMasterPort;
+        } else if (if_name == "int_slave") {
+            return intSlavePort;
         } else if (if_name == "pio") {
             return pioPort;
         }
@@ -260,7 +261,7 @@ class Interrupts : public BaseInterrupts
      * Functions for retrieving interrupts for the CPU to handle.
      */
 
-    bool checkInterrupts() const override;
+    bool checkInterrupts(ThreadContext *tc) const override;
     /**
      * Check if there are pending interrupts without ignoring the
      * interrupts disabled flag.
@@ -274,8 +275,8 @@ class Interrupts : public BaseInterrupts
      * @return true there are unmaskable interrupts pending.
      */
     bool hasPendingUnmaskable() const { return pendingUnmaskableInt; }
-    Fault getInterrupt() override;
-    void updateIntrInfo() override;
+    Fault getInterrupt(ThreadContext *tc) override;
+    void updateIntrInfo(ThreadContext *tc) override;
 
     /*
      * Serialization.

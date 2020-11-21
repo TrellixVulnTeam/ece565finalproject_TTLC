@@ -210,7 +210,8 @@ let {{
 
     vmrsCode = vmrsEnabledCheckCode + '''
     CPSR cpsr = Cpsr;
-    if (!isSecure(xc->tcBase()) && (cpsr.mode != MODE_HYP)) {
+    SCR  scr  = Scr;
+    if (!inSecureState(scr, cpsr) && (cpsr.mode != MODE_HYP)) {
         HCR hcr = Hcr;
         bool hypTrap = false;
         switch(xc->tcBase()->flattenRegId(RegId(MiscRegClass, op1)).index()) {
@@ -461,7 +462,7 @@ let {{
     exec_output = ""
 
     singleSimpleCode = vfpEnabledCheckCode + '''
-        M5_VAR_USED FPSCR fpscr = (FPSCR) FpscrExc;
+        FPSCR fpscr M5_VAR_USED = (FPSCR) FpscrExc;
         FpDest = %(op)s;
     '''
     singleCode = singleSimpleCode + '''
@@ -482,7 +483,7 @@ let {{
                 "%(func)s, fpscr.fz, fpscr.dn, fpscr.rMode)"
     singleUnaryOp = "unaryOp(fpscr, FpOp1, %(func)s, fpscr.fz, fpscr.rMode)"
     doubleCode = vfpEnabledCheckCode + '''
-        M5_VAR_USED FPSCR fpscr = (FPSCR) FpscrExc;
+        FPSCR fpscr M5_VAR_USED = (FPSCR) FpscrExc;
         double dest = %(op)s;
         FpDestP0_uw = dblLow(dest);
         FpDestP1_uw = dblHi(dest);

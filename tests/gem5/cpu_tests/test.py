@@ -51,7 +51,10 @@ valid_isas = {
     'riscv': ('AtomicSimpleCPU', 'TimingSimpleCPU', 'MinorCPU', 'DerivO3CPU'),
 }
 
-base_path = joinpath(config.bin_path, 'cpu_tests')
+if config.bin_path:
+    base_path = config.bin_path
+else:
+    base_path = joinpath(absdirpath(__file__), 'benchmarks', 'bin')
 
 base_url = config.resource_url + '/gem5/cpu_tests/benchmarks/bin/'
 for isa in valid_isas:

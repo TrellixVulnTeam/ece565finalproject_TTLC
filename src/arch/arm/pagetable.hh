@@ -47,11 +47,13 @@
 #include "arch/arm/utility.hh"
 #include "sim/serialize.hh"
 
-namespace ArmISA
-{
+namespace ArmISA {
 
-// Max. physical address range in bits supported by the architecture
-const unsigned MaxPhysAddrRange = 48;
+struct VAddr
+{
+    VAddr(Addr a) { panic("not implemented yet."); }
+};
+
 
 // ITB/DTB page table entry
 struct PTE
@@ -186,23 +188,22 @@ struct TlbEntry : public Serializable
 
     bool
     match(Addr va, uint8_t _vmid, bool hypLookUp, bool secure_lookup,
-          ExceptionLevel target_el, bool in_host) const
+          ExceptionLevel target_el) const
     {
-        return match(va, 0, _vmid, hypLookUp, secure_lookup, true,
-                     target_el, in_host);
+        return match(va, 0, _vmid, hypLookUp, secure_lookup, true, target_el);
     }
 
     bool
     match(Addr va, uint16_t asn, uint8_t _vmid, bool hypLookUp,
-          bool secure_lookup, bool ignore_asn, ExceptionLevel target_el,
-          bool in_host) const
+          bool secure_lookup, bool ignore_asn, ExceptionLevel target_el) const
     {
         bool match = false;
         Addr v = vpn << N;
+
         if (valid && va >= v && va <= v + size && (secure_lookup == !nstid) &&
             (hypLookUp == isHyp))
         {
-            match = checkELMatch(target_el, in_host);
+            match = checkELMatch(target_el);
 
             if (match && !ignore_asn) {
                 match = global || (asn == asid);
@@ -215,20 +216,12 @@ struct TlbEntry : public Serializable
     }
 
     bool
-    checkELMatch(ExceptionLevel target_el, bool in_host) const
+    checkELMatch(ExceptionLevel target_el) const
     {
-        switch (target_el) {
-            case EL3:
-                return el == EL3;
-            case EL2:
-              {
-                return el == EL2 || (el == EL0 && in_host);
-              }
-            case EL1:
-            case EL0:
-                return (el == EL0) || (el == EL1);
-            default:
-                return false;
+        if (target_el == EL2 || target_el == EL3) {
+            return (el  == target_el);
+        } else {
+            return (el == EL0) || (el == EL1);
         }
     }
 

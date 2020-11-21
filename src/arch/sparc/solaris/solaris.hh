@@ -35,7 +35,7 @@ class SparcSolaris : public Solaris
 {
   public:
 
-    static const ByteOrder byteOrder = ByteOrder::big;
+    static const ByteOrder byteOrder = BigEndianByteOrder;
 
     static SyscallFlagTransTable openFlagTable[];
 

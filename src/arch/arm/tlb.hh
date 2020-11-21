@@ -160,34 +160,30 @@ class TLB : public BaseTLB
 
     TlbTestInterface *test;
 
-    struct TlbStats : public Stats::Group
-    {
-        TlbStats(Stats::Group *parent);
-        // Access Stats
-        mutable Stats::Scalar instHits;
-        mutable Stats::Scalar instMisses;
-        mutable Stats::Scalar readHits;
-        mutable Stats::Scalar readMisses;
-        mutable Stats::Scalar writeHits;
-        mutable Stats::Scalar writeMisses;
-        mutable Stats::Scalar inserts;
-        mutable Stats::Scalar flushTlb;
-        mutable Stats::Scalar flushTlbMva;
-        mutable Stats::Scalar flushTlbMvaAsid;
-        mutable Stats::Scalar flushTlbAsid;
-        mutable Stats::Scalar flushedEntries;
-        mutable Stats::Scalar alignFaults;
-        mutable Stats::Scalar prefetchFaults;
-        mutable Stats::Scalar domainFaults;
-        mutable Stats::Scalar permsFaults;
+    // Access Stats
+    mutable Stats::Scalar instHits;
+    mutable Stats::Scalar instMisses;
+    mutable Stats::Scalar readHits;
+    mutable Stats::Scalar readMisses;
+    mutable Stats::Scalar writeHits;
+    mutable Stats::Scalar writeMisses;
+    mutable Stats::Scalar inserts;
+    mutable Stats::Scalar flushTlb;
+    mutable Stats::Scalar flushTlbMva;
+    mutable Stats::Scalar flushTlbMvaAsid;
+    mutable Stats::Scalar flushTlbAsid;
+    mutable Stats::Scalar flushedEntries;
+    mutable Stats::Scalar alignFaults;
+    mutable Stats::Scalar prefetchFaults;
+    mutable Stats::Scalar domainFaults;
+    mutable Stats::Scalar permsFaults;
 
-        Stats::Formula readAccesses;
-        Stats::Formula writeAccesses;
-        Stats::Formula instAccesses;
-        Stats::Formula hits;
-        Stats::Formula misses;
-        Stats::Formula accesses;
-    } stats;
+    Stats::Formula readAccesses;
+    Stats::Formula writeAccesses;
+    Stats::Formula instAccesses;
+    Stats::Formula hits;
+    Stats::Formula misses;
+    Stats::Formula accesses;
 
     /** PMU probe for TLB refills */
     ProbePoints::PMUUPtr ppRefills;
@@ -210,8 +206,7 @@ class TLB : public BaseTLB
      */
     TlbEntry *lookup(Addr vpn, uint16_t asn, uint8_t vmid, bool hyp,
                      bool secure, bool functional,
-                     bool ignore_asn, ExceptionLevel target_el,
-                     bool in_host);
+                     bool ignore_asn, ExceptionLevel target_el);
 
     virtual ~TLB();
 
@@ -224,7 +219,7 @@ class TLB : public BaseTLB
 
     TableWalker *getTableWalker() { return tableWalker; }
 
-    void setMMU(Stage2MMU *m, RequestorID requestor_id);
+    void setMMU(Stage2MMU *m, MasterID master_id);
 
     int getsize() const { return size; }
 
@@ -251,7 +246,7 @@ class TLB : public BaseTLB
      * @param secure_lookup if the operation affects the secure world
      */
     void flushAllSecurity(bool secure_lookup, ExceptionLevel target_el,
-                          bool ignore_el = false, bool in_host = false);
+                          bool ignore_el = false);
 
     /** Remove all entries in the non secure world, depending on whether they
      *  were allocated in hyp mode or not
@@ -264,8 +259,8 @@ class TLB : public BaseTLB
      */
     void flushAll() override
     {
-        flushAllSecurity(false, EL0, true, false);
-        flushAllSecurity(true, EL0, true, false);
+        flushAllSecurity(false, EL0, true);
+        flushAllSecurity(true, EL0, true);
     }
 
     /** Remove any entries that match both a va and asn
@@ -274,21 +269,20 @@ class TLB : public BaseTLB
      * @param secure_lookup if the operation affects the secure world
      */
     void flushMvaAsid(Addr mva, uint64_t asn, bool secure_lookup,
-                      ExceptionLevel target_el, bool in_host = false);
+                      ExceptionLevel target_el);
 
     /** Remove any entries that match the asn
      * @param asn contextid/asn to flush on match
      * @param secure_lookup if the operation affects the secure world
      */
     void flushAsid(uint64_t asn, bool secure_lookup,
-                   ExceptionLevel target_el, bool in_host = false);
+                   ExceptionLevel target_el);
 
     /** Remove all entries that match the va regardless of asn
      * @param mva address to flush from cache
      * @param secure_lookup if the operation affects the secure world
      */
-    void flushMva(Addr mva, bool secure_lookup, ExceptionLevel target_el,
-                  bool in_host = false);
+    void flushMva(Addr mva, bool secure_lookup, ExceptionLevel target_el);
 
     /**
      * Invalidate all entries in the stage 2 TLB that match the given ipa
@@ -389,6 +383,8 @@ class TLB : public BaseTLB
 
     void drainResume() override;
 
+    void regStats() override;
+
     void regProbePoints() override;
 
     /**
@@ -399,7 +395,7 @@ class TLB : public BaseTLB
      * reference. For ARM this method will always return a valid port
      * pointer.
      *
-     * @return A pointer to the walker request port
+     * @return A pointer to the walker master port
      */
     Port *getTableWalkerPort() override;
 
@@ -451,11 +447,9 @@ private:
      * @param asn contextid/asn to flush on match
      * @param secure_lookup if the operation affects the secure world
      * @param ignore_asn if the flush should ignore the asn
-     * @param in_host if hcr.e2h == 1 and hcr.tge == 1 for VHE.
      */
     void _flushMva(Addr mva, uint64_t asn, bool secure_lookup,
-                   bool ignore_asn, ExceptionLevel target_el,
-                   bool in_host);
+                   bool ignore_asn, ExceptionLevel target_el);
 
   public: /* Testing */
     Fault testTranslation(const RequestPtr &req, Mode mode,

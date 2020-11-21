@@ -73,7 +73,7 @@ class MacroopBase : public X86StaticInst
     StaticInstPtr * microops;
 
     StaticInstPtr
-    fetchMicroop(MicroPC microPC) const override
+    fetchMicroop(MicroPC microPC) const
     {
         if (microPC >= numMicroops)
             return badMicroop;
@@ -82,8 +82,7 @@ class MacroopBase : public X86StaticInst
     }
 
     std::string
-    generateDisassembly(Addr pc,
-                        const Loader::SymbolTable *symtab) const override
+    generateDisassembly(Addr pc, const Loader::SymbolTable *symtab) const
     {
         return mnemonic;
     }

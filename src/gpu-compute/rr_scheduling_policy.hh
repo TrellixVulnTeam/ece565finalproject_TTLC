@@ -36,7 +36,6 @@
 
 #include <vector>
 
-#include "base/logging.hh"
 #include "gpu-compute/scheduling_policy.hh"
 #include "gpu-compute/wavefront.hh"
 

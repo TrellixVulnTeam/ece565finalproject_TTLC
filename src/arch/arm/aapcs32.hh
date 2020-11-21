@@ -37,9 +37,8 @@
 #include "arch/arm/utility.hh"
 #include "base/intmath.hh"
 #include "cpu/thread_context.hh"
-#include "mem/port_proxy.hh"
 #include "sim/guest_abi.hh"
-#include "sim/proxy_ptr.hh"
+#include "sim/syscall_emul_buf.hh"
 
 class ThreadContext;
 
@@ -114,7 +113,8 @@ struct Aapcs32ArgumentBase
         state.nsaa = roundUp(state.nsaa, align);
 
         // Extract the value from it.
-        ConstVPtr<T> val(state.nsaa, tc);
+        TypedBufferArg<T> val(state.nsaa);
+        val.copyIn(tc->getVirtProxy());
 
         // Move the nsaa past this argument.
         state.nsaa += size;
@@ -165,7 +165,7 @@ struct Result<Aapcs32, Integer, typename std::enable_if<
     {
         if (std::is_same<Integer, Addr>::value) {
             tc->setIntReg(ArmISA::INTREG_R0, (uint32_t)i);
-        } else if (ArmISA::byteOrder(tc) == ByteOrder::little) {
+        } else if (ArmISA::byteOrder(tc) == LittleEndianByteOrder) {
             tc->setIntReg(ArmISA::INTREG_R0, (uint32_t)(i >> 0));
             tc->setIntReg(ArmISA::INTREG_R1, (uint32_t)(i >> 32));
         } else {
@@ -213,7 +213,7 @@ struct Argument<Aapcs32, Integer, typename std::enable_if<
         if (sizeof(Integer) == sizeof(uint64_t) &&
                 state.ncrn + 1 <= state.MAX_CRN) {
             Integer low, high;
-            if (ArmISA::byteOrder(tc) == ByteOrder::little) {
+            if (ArmISA::byteOrder(tc) == LittleEndianByteOrder) {
                 low = tc->readIntReg(state.ncrn++) & mask(32);
                 high = tc->readIntReg(state.ncrn++) & mask(32);
             } else {
@@ -284,8 +284,9 @@ struct Result<Aapcs32, Composite, typename std::enable_if<
             val = gtoh(val, ArmISA::byteOrder(tc));
             tc->setIntReg(ArmISA::INTREG_R0, val);
         } else {
-            VPtr<Composite> cp(state.retAddr, tc);
-            *cp = htog(composite, ArmISA::byteOrder(tc));
+            TypedBufferArg<Composite> cp(state.retAddr);
+            cp = htog(composite, ArmISA::byteOrder(tc));
+            cp.copyOut(tc->getVirtProxy());
         }
     }
 

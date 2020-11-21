@@ -53,12 +53,12 @@ namespace X86ISA
 {
 
 template <class Device>
-class IntResponsePort : public SimpleTimingPort
+class IntSlavePort : public SimpleTimingPort
 {
     Device * device;
 
   public:
-    IntResponsePort(const std::string& _name, SimObject* _parent,
+    IntSlavePort(const std::string& _name, SimObject* _parent,
                  Device* dev) :
         SimpleTimingPort(_name, _parent), device(dev)
     {
@@ -86,7 +86,7 @@ PacketPtr
 buildIntPacket(Addr addr, T payload)
 {
     RequestPtr req = std::make_shared<Request>(
-        addr, sizeof(T), Request::UNCACHEABLE, Request::intRequestorId);
+        addr, sizeof(T), Request::UNCACHEABLE, Request::intMasterId);
     PacketPtr pkt = new Packet(req, MemCmd::WriteReq);
     pkt->allocate();
     pkt->setRaw<T>(payload);
@@ -94,7 +94,7 @@ buildIntPacket(Addr addr, T payload)
 }
 
 template <class Device>
-class IntRequestPort : public QueuedRequestPort
+class IntMasterPort : public QueuedMasterPort
 {
   private:
     ReqPacketQueue reqQueue;
@@ -113,9 +113,9 @@ class IntRequestPort : public QueuedRequestPort
     static void defaultOnCompletion(PacketPtr pkt) { delete pkt; }
 
   public:
-    IntRequestPort(const std::string& _name, SimObject* _parent,
+    IntMasterPort(const std::string& _name, SimObject* _parent,
                   Device* dev, Tick _latency) :
-        QueuedRequestPort(_name, _parent, reqQueue, snoopRespQueue),
+        QueuedMasterPort(_name, _parent, reqQueue, snoopRespQueue),
         reqQueue(*_parent, *this), snoopRespQueue(*_parent, *this),
         device(dev), latency(_latency)
     {

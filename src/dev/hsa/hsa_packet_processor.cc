@@ -47,7 +47,7 @@
 #include "mem/packet_access.hh"
 #include "mem/page_table.hh"
 #include "sim/process.hh"
-#include "sim/proxy_ptr.hh"
+#include "sim/syscall_emul_buf.hh"
 #include "sim/system.hh"
 
 #define HSAPP_EVENT_DESCRIPTION_GENERATOR(XEVENT) \
@@ -59,11 +59,6 @@
 
 #define PKT_TYPE(PKT) ((hsa_packet_type_t)(((PKT->header) >> \
             HSA_PACKET_HEADER_TYPE) & (HSA_PACKET_HEADER_WIDTH_TYPE - 1)))
-
-// checks if the barrier bit is set in the header -- shift the barrier bit
-// to LSB, then bitwise "and" to mask off all other bits
-#define IS_BARRIER(PKT) ((hsa_packet_header_t)(((PKT->header) >> \
-            HSA_PACKET_HEADER_BARRIER) & HSA_PACKET_HEADER_WIDTH_BARRIER))
 
 HSAPP_EVENT_DESCRIPTION_GENERATOR(UpdateReadDispIdDmaEvent)
 HSAPP_EVENT_DESCRIPTION_GENERATOR(CmdQueueCmdDmaEvent)
@@ -126,7 +121,7 @@ HSAPacketProcessor::write(Packet *pkt)
     assert(pkt->getAddr() >= pioAddr && pkt->getAddr() < pioAddr + pioSize);
 
     // TODO: How to get pid??
-    M5_VAR_USED Addr daddr = pkt->getAddr() - pioAddr;
+    Addr M5_VAR_USED daddr = pkt->getAddr() - pioAddr;
 
     DPRINTF(HSAPacketProcessor,
           "%s: write of size %d to reg-offset %d (0x%x)\n",
@@ -156,7 +151,7 @@ HSAPacketProcessor::translateOrDie(Addr vaddr, Addr &paddr)
     // Grab the process and try to translate the virtual address with it; with
     // new extensions, it will likely be wrong to just arbitrarily grab context
     // zero.
-    auto process = sys->threads[0]->getProcessPtr();
+    auto process = sys->getThreadContext(0)->getProcessPtr();
 
     if (!process->pTable->translate(vaddr, paddr))
         fatal("failed translation: vaddr 0x%x\n", vaddr);
@@ -256,7 +251,7 @@ void
 HSAPacketProcessor::CmdQueueCmdDmaEvent::process()
 {
     uint32_t rl_idx = series_ctx->rl_idx;
-    M5_VAR_USED AQLRingBuffer *aqlRingBuffer =
+    AQLRingBuffer *aqlRingBuffer M5_VAR_USED =
         hsaPP->regdQList[rl_idx]->qCntxt.aqlBuf;
     HSAQueueDescriptor* qDesc =
         hsaPP->regdQList[rl_idx]->qCntxt.qDesc;
@@ -282,11 +277,11 @@ HSAPacketProcessor::CmdQueueCmdDmaEvent::process()
 }
 
 void
-HSAPacketProcessor::schedAQLProcessing(uint32_t rl_idx, Tick delay)
+HSAPacketProcessor::schedAQLProcessing(uint32_t rl_idx)
 {
     RQLEntry *queue = regdQList[rl_idx];
     if (!queue->aqlProcessEvent.scheduled()) {
-        Tick processingTick = curTick() + delay;
+        Tick processingTick = curTick() + pktProcessDelay;
         schedule(queue->aqlProcessEvent, processingTick);
         DPRINTF(HSAPacketProcessor, "AQL processing scheduled at tick: %d\n",
                 processingTick);
@@ -295,48 +290,32 @@ HSAPacketProcessor::schedAQLProcessing(uint32_t rl_idx, Tick delay)
     }
 }
 
-void
-HSAPacketProcessor::schedAQLProcessing(uint32_t rl_idx)
-{
-    schedAQLProcessing(rl_idx, pktProcessDelay);
-}
-
-Q_STATE
+bool
 HSAPacketProcessor::processPkt(void* pkt, uint32_t rl_idx, Addr host_pkt_addr)
 {
-    Q_STATE is_submitted = BLOCKED_BPKT;
+    bool is_submitted = false;
     SignalState *dep_sgnl_rd_st = &(regdQList[rl_idx]->depSignalRdState);
     // Dependency signals are not read yet. And this can only be a retry.
     // The retry logic will schedule the packet processor wakeup
     if (dep_sgnl_rd_st->pendingReads != 0) {
-        return BLOCKED_BPKT;
+        return false;
     }
     // `pkt` can be typecasted to any type of AQL packet since they all
     // have header information at offset zero
     auto disp_pkt = (_hsa_dispatch_packet_t *)pkt;
     hsa_packet_type_t pkt_type = PKT_TYPE(disp_pkt);
-    if (IS_BARRIER(disp_pkt) &&
-        regdQList[rl_idx]->compltnPending() > 0) {
-        // If this packet is using the "barrier bit" to enforce ordering with
-        // previous packets, and if there are outstanding packets, set the
-        // barrier bit for this queue and block the queue.
-        DPRINTF(HSAPacketProcessor, "%s: setting barrier bit for active" \
-                " list ID = %d\n", __FUNCTION__, rl_idx);
-        regdQList[rl_idx]->setBarrierBit(true);
-        return BLOCKED_BBIT;
-    }
     if (pkt_type == HSA_PACKET_TYPE_VENDOR_SPECIFIC) {
         DPRINTF(HSAPacketProcessor, "%s: submitting vendor specific pkt" \
                 " active list ID = %d\n", __FUNCTION__, rl_idx);
         // Submit packet to HSA device (dispatcher)
         hsa_device->submitVendorPkt((void *)disp_pkt, rl_idx, host_pkt_addr);
-        is_submitted = UNBLOCKED;
+        is_submitted = true;
     } else if (pkt_type == HSA_PACKET_TYPE_KERNEL_DISPATCH) {
         DPRINTF(HSAPacketProcessor, "%s: submitting kernel dispatch pkt" \
                 " active list ID = %d\n", __FUNCTION__, rl_idx);
         // Submit packet to HSA device (dispatcher)
         hsa_device->submitDispatchPkt((void *)disp_pkt, rl_idx, host_pkt_addr);
-        is_submitted = UNBLOCKED;
+        is_submitted = true;
     } else if (pkt_type == HSA_PACKET_TYPE_BARRIER_AND) {
         DPRINTF(HSAPacketProcessor, "%s: Processing barrier packet" \
                 " active list ID = %d\n", __FUNCTION__, rl_idx);
@@ -393,7 +372,7 @@ HSAPacketProcessor::processPkt(void* pkt, uint32_t rl_idx, Addr host_pkt_addr)
             // TODO: Completion signal of barrier packet to be
             // atomically decremented here
             finishPkt((void*)bar_and_pkt, rl_idx);
-            is_submitted = UNBLOCKED;
+            is_submitted = true;
             // Reset signal values
             dep_sgnl_rd_st->resetSigVals();
             // The completion signal is connected
@@ -414,10 +393,13 @@ HSAPacketProcessor::processPkt(void* pkt, uint32_t rl_idx, Addr host_pkt_addr)
                  * The reason for this is that the DMASequencer does
                  * not support atomic operations.
                  */
-                VPtr<uint64_t> prev_signal(signal_addr, sys->threads[0]);
+                auto tc = sys->getThreadContext(0);
+                auto &virt_proxy = tc->getVirtProxy();
+                TypedBufferArg<uint64_t> prev_signal(signal_addr);
+                prev_signal.copyIn(virt_proxy);
 
                 hsa_signal_value_t *new_signal = new hsa_signal_value_t;
-                *new_signal = (hsa_signal_value_t)*prev_signal - 1;
+                *new_signal = (hsa_signal_value_t) *prev_signal - 1;
 
                 dmaWriteVirt(signal_addr,
                              sizeof(hsa_signal_value_t), NULL, new_signal, 0);
@@ -450,13 +432,6 @@ HSAPacketProcessor::QueueProcessEvent::process()
             " dispIdx %d, active list ID = %d\n",
             __FUNCTION__, aqlRingBuffer->rdIdx(),
             aqlRingBuffer->wrIdx(), aqlRingBuffer->dispIdx(), rqIdx);
-    // If barrier bit is set, then this wakeup is a dummy wakeup
-    // just to model the processing time. Do nothing.
-    if (hsaPP->regdQList[rqIdx]->getBarrierBit()) {
-        DPRINTF(HSAPacketProcessor,
-            "Dummy wakeup with barrier bit for rdIdx %d\n", rqIdx);
-        return;
-    }
     // In the future, we may support batch processing of packets.
     // Then, we can just remove the break statements and the code
     // will support batch processing. That is why we are using a
@@ -466,8 +441,7 @@ HSAPacketProcessor::QueueProcessEvent::process()
         DPRINTF(HSAPacketProcessor, "%s: Attempting dispatch @ dispIdx[%d]\n",
                 __FUNCTION__, aqlRingBuffer->dispIdx());
         Addr host_addr = aqlRingBuffer->hostDispAddr();
-        Q_STATE q_state = hsaPP->processPkt(pkt, rqIdx, host_addr);
-        if (q_state == UNBLOCKED) {
+        if (hsaPP->processPkt(pkt, rqIdx, host_addr)) {
              aqlRingBuffer->incDispIdx(1);
              DPRINTF(HSAPacketProcessor, "%s: Increment dispIdx[%d]\n",
                      __FUNCTION__, aqlRingBuffer->dispIdx());
@@ -475,20 +449,10 @@ HSAPacketProcessor::QueueProcessEvent::process()
                  hsaPP->schedAQLProcessing(rqIdx);
              }
              break;
-        } else if (q_state == BLOCKED_BPKT) {
-            // This queue is blocked by barrier packet,
-            // schedule a processing event
-            hsaPP->schedAQLProcessing(rqIdx);
-            break;
-        } else if (q_state == BLOCKED_BBIT) {
-            // This queue is blocked by barrier bit, and processing event
-            // should be scheduled from finishPkt(). However, to elapse
-            // "pktProcessDelay" processing time, let us schedule a dummy
-            // wakeup once which will just wakeup and will do nothing.
-            hsaPP->schedAQLProcessing(rqIdx);
-            break;
         } else {
-            panic("Unknown queue state\n");
+            // This queue is blocked, scheduled a processing event
+            hsaPP->schedAQLProcessing(rqIdx);
+            break;
         }
     }
 }
@@ -590,7 +554,7 @@ HSAPacketProcessor::getCommandsFromHost(int pid, uint32_t rl_idx)
 void
 HSAPacketProcessor::displayQueueDescriptor(int pid, uint32_t rl_idx)
 {
-    M5_VAR_USED HSAQueueDescriptor* qDesc = regdQList[rl_idx]->qCntxt.qDesc;
+    HSAQueueDescriptor* M5_VAR_USED qDesc = regdQList[rl_idx]->qCntxt.qDesc;
     DPRINTF(HSAPacketProcessor,
             "%s: pid[%d], basePointer[0x%lx], dBPointer[0x%lx], "
             "writeIndex[0x%x], readIndex[0x%x], size(bytes)[0x%x]\n",
@@ -667,27 +631,6 @@ void
 HSAPacketProcessor::finishPkt(void *pvPkt, uint32_t rl_idx)
 {
     HSAQueueDescriptor* qDesc = regdQList[rl_idx]->qCntxt.qDesc;
-
-    // if barrier bit was set and this is the last
-    // outstanding packet from that queue,
-    // unset it here
-    if (regdQList[rl_idx]->getBarrierBit() &&
-        regdQList[rl_idx]->isLastOutstandingPkt()) {
-        DPRINTF(HSAPacketProcessor,
-                "Unset barrier bit for active list ID %d\n", rl_idx);
-        regdQList[rl_idx]->setBarrierBit(false);
-        panic_if(!regdQList[rl_idx]->dispPending(),
-                 "There should be pending kernels in this queue\n");
-        DPRINTF(HSAPacketProcessor,
-                "Rescheduling active list ID %d after unsetting barrier "
-                "bit\n", rl_idx);
-        // Try to schedule wakeup in the next cycle.  There is a minimum
-        // pktProcessDelay for queue wake up. If that processing delay is
-        // elapsed, schedAQLProcessing will wakeup next tick.
-        schedAQLProcessing(rl_idx, 1);
-    }
-
-    // If set, then blocked schedule, so need to reschedule
     if (regdQList[rl_idx]->qCntxt.aqlBuf->freeEntry(pvPkt))
         updateReadIndex(0, rl_idx);
     DPRINTF(HSAPacketProcessor,

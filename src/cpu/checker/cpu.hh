@@ -89,7 +89,7 @@ class CheckerCPU : public BaseCPU, public ExecContext
     using VecRegContainer = TheISA::VecRegContainer;
 
     /** id attached to all issued requests */
-    RequestorID requestorId;
+    MasterID masterId;
   public:
     void init() override;
 
@@ -99,9 +99,9 @@ class CheckerCPU : public BaseCPU, public ExecContext
 
     void setSystem(System *system);
 
-    void setIcachePort(RequestPort *icache_port);
+    void setIcachePort(MasterPort *icache_port);
 
-    void setDcachePort(RequestPort *dcache_port);
+    void setDcachePort(MasterPort *dcache_port);
 
     Port &
     getDataPort() override
@@ -127,8 +127,8 @@ class CheckerCPU : public BaseCPU, public ExecContext
 
     System *systemPtr;
 
-    RequestPort *icachePort;
-    RequestPort *dcachePort;
+    MasterPort *icachePort;
+    MasterPort *dcachePort;
 
     ThreadContext *tc;
 
@@ -434,41 +434,6 @@ class CheckerCPU : public BaseCPU, public ExecContext
         thread->setMemAccPredicate(val);
     }
 
-    uint64_t
-    getHtmTransactionUid() const override
-    {
-        panic("not yet supported!");
-        return 0;
-    };
-
-    uint64_t
-    newHtmTransactionUid() const override
-    {
-        panic("not yet supported!");
-        return 0;
-    };
-
-    Fault
-    initiateHtmCmd(Request::Flags flags) override
-    {
-        panic("not yet supported!");
-        return NoFault;
-    }
-
-    bool
-    inHtmTransactionalState() const override
-    {
-        panic("not yet supported!");
-        return false;
-    }
-
-    uint64_t
-    getHtmTransactionalDepth() const override
-    {
-        panic("not yet supported!");
-        return 0;
-    }
-
     TheISA::PCState pcState() const override { return thread->pcState(); }
     void
     pcState(const TheISA::PCState &val) override
@@ -587,12 +552,12 @@ class CheckerCPU : public BaseCPU, public ExecContext
 
     Fault readMem(Addr addr, uint8_t *data, unsigned size,
                   Request::Flags flags,
-                  const std::vector<bool>& byte_enable)
+                  const std::vector<bool>& byte_enable = std::vector<bool>())
         override;
 
     Fault writeMem(uint8_t *data, unsigned size, Addr addr,
                    Request::Flags flags, uint64_t *res,
-                   const std::vector<bool>& byte_enable)
+                   const std::vector<bool>& byte_enable = std::vector<bool>())
         override;
 
     Fault amoMem(Addr addr, uint8_t* data, unsigned size,
@@ -610,6 +575,9 @@ class CheckerCPU : public BaseCPU, public ExecContext
     /////////////////////////////////////////////////////
 
     void wakeup(ThreadID tid) override { }
+    // Assume that the normal CPU's call to syscall was successful.
+    // The checker's state would have already been updated by the syscall.
+    void syscall(Fault *fault) override { }
 
     void
     handleError()

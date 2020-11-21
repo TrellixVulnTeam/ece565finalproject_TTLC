@@ -155,8 +155,15 @@ Process::Process(ProcessParams *params, EmulationPageTable *pTable,
 
     image = objFile->buildImage();
 
-    if (::Loader::debugSymbolTable.empty())
-        ::Loader::debugSymbolTable = objFile->symtab();
+    if (!::Loader::debugSymbolTable) {
+        ::Loader::debugSymbolTable = new ::Loader::SymbolTable();
+        if (!objFile->loadGlobalSymbols(::Loader::debugSymbolTable) ||
+            !objFile->loadLocalSymbols(::Loader::debugSymbolTable) ||
+            !objFile->loadWeakSymbols(::Loader::debugSymbolTable)) {
+            delete ::Loader::debugSymbolTable;
+            ::Loader::debugSymbolTable = nullptr;
+        }
+    }
 }
 
 void
@@ -293,7 +300,7 @@ Process::initState()
         fatal("Process %s is not associated with any HW contexts!\n", name());
 
     // first thread context for this process... initialize & enable
-    ThreadContext *tc = system->threads[contextIds[0]];
+    ThreadContext *tc = system->getThreadContext(contextIds[0]);
 
     // mark this context as active so it will start ticking.
     tc->activate();
@@ -318,7 +325,7 @@ Process::drain()
 void
 Process::allocateMem(Addr vaddr, int64_t size, bool clobber)
 {
-    int npages = divCeil(size, (int64_t)system->getPageBytes());
+    int npages = divCeil(size, (int64_t)PageBytes);
     Addr paddr = system->allocPhysPages(npages);
     pTable->map(vaddr, paddr, size,
                 clobber ? EmulationPageTable::Clobber :
@@ -333,14 +340,14 @@ Process::replicatePage(Addr vaddr, Addr new_paddr, ThreadContext *old_tc,
         new_paddr = system->allocPhysPages(1);
 
     // Read from old physical page.
-    uint8_t *buf_p = new uint8_t[system->getPageBytes()];
-    old_tc->getVirtProxy().readBlob(vaddr, buf_p, system->getPageBytes());
+    uint8_t *buf_p = new uint8_t[PageBytes];
+    old_tc->getVirtProxy().readBlob(vaddr, buf_p, PageBytes);
 
     // Create new mapping in process address space by clobbering existing
     // mapping (if any existed) and then write to the new physical page.
     bool clobber = true;
-    pTable->map(vaddr, new_paddr, system->getPageBytes(), clobber);
-    new_tc->getVirtProxy().writeBlob(vaddr, buf_p, system->getPageBytes());
+    pTable->map(vaddr, new_paddr, PageBytes, clobber);
+    new_tc->getVirtProxy().writeBlob(vaddr, buf_p, PageBytes);
     delete[] buf_p;
 }
 
@@ -442,7 +449,7 @@ Process::updateBias()
 
     // Determine how large the interpreters footprint will be in the process
     // address space.
-    Addr interp_mapsize = roundUp(interp->mapSize(), system->getPageBytes());
+    Addr interp_mapsize = roundUp(interp->mapSize(), TheISA::PageBytes);
 
     // We are allocating the memory area; set the bias to the lowest address
     // in the allocated memory region.

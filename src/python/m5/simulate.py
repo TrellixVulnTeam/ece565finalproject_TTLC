@@ -107,9 +107,8 @@ def instantiate(ckpt_dir=None):
         except ImportError:
             pass
 
-    if options.dot_config:
-        do_dot(root, options.outdir, options.dot_config)
-        do_ruby_dot(root, options.outdir, options.dot_config)
+    do_dot(root, options.outdir, options.dot_config)
+    do_ruby_dot(root, options.outdir, options.dot_config)
 
     # Initialize the global statistics
     stats.initSimStats()

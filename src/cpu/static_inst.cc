@@ -106,6 +106,7 @@ StaticInst::branchTarget(const TheISA::PCState &pc) const
 {
     panic("StaticInst::branchTarget() called on instruction "
           "that is not a PC-relative branch.");
+    M5_DUMMY_RETURN;
 }
 
 TheISA::PCState
@@ -113,6 +114,7 @@ StaticInst::branchTarget(ThreadContext *tc) const
 {
     panic("StaticInst::branchTarget() called on instruction "
           "that is not an indirect branch.");
+    M5_DUMMY_RETURN;
 }
 
 const string &

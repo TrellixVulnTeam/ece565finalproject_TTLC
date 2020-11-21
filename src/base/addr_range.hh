@@ -88,9 +88,6 @@ class AddrRange
 
   public:
 
-    /**
-     * @ingroup api_addr_range
-     */
     AddrRange()
         : _start(1), _end(0), intlvMatch(0)
     {}
@@ -122,8 +119,6 @@ class AddrRange
      * @param _end The end address of this range (not included in  the range)
      * @param _masks The input vector of masks
      * @param intlv_match The matching value of the xor operations
-     *
-     * @ingroup api_addr_range
      */
     AddrRange(Addr _start, Addr _end, const std::vector<Addr> &_masks,
               uint8_t _intlv_match)
@@ -159,8 +154,6 @@ class AddrRange
      * @param _xor_high_bit The MSB of the xor bit (disabled if 0)
      * @param _intlv_bits the size, in bits, of the intlv and xor bits
      * @param intlv_match The matching value of the xor operations
-     *
-     * @ingroup api_addr_range
      */
     AddrRange(Addr _start, Addr _end, uint8_t _intlv_high_bit,
               uint8_t _xor_high_bit, uint8_t _intlv_bits,
@@ -209,8 +202,6 @@ class AddrRange
      * ranges.
      *
      * @param ranges Interleaved ranges to be merged
-     *
-     * @ingroup api_addr_range
      */
     AddrRange(const std::vector<AddrRange>& ranges)
         : _start(1), _end(0), intlvMatch(0)
@@ -251,8 +242,6 @@ class AddrRange
      * Determine if the range is interleaved or not.
      *
      * @return true if interleaved
-     *
-     * @ingroup api_addr_range
      */
     bool interleaved() const { return masks.size() > 0; }
 
@@ -260,8 +249,6 @@ class AddrRange
      * Determing the interleaving granularity of the range.
      *
      * @return The size of the regions created by the interleaving bits
-     *
-     * @ingroup api_addr_range
      */
     uint64_t granularity() const
     {
@@ -282,8 +269,6 @@ class AddrRange
      * is part of.
      *
      * @return The number of stripes spanned by the interleaving bits
-     *
-     * @ingroup api_addr_range
      */
     uint32_t stripes() const { return ULL(1) << masks.size(); }
 
@@ -291,8 +276,6 @@ class AddrRange
      * Get the size of the address range. For a case where
      * interleaving is used we make the simplifying assumption that
      * the size is a divisible by the size of the interleaving slice.
-     *
-     * @ingroup api_addr_range
      */
     Addr size() const
     {
@@ -301,22 +284,16 @@ class AddrRange
 
     /**
      * Determine if the range is valid.
-     *
-     * @ingroup api_addr_range
      */
     bool valid() const { return _start <= _end; }
 
     /**
      * Get the start address of the range.
-     *
-     * @ingroup api_addr_range
      */
     Addr start() const { return _start; }
 
     /**
      * Get the end address of the range.
-     *
-     * @ingroup api_addr_range
      */
     Addr end() const { return _end; }
 
@@ -324,8 +301,6 @@ class AddrRange
      * Get a string representation of the range. This could
      * alternatively be implemented as a operator<<, but at the moment
      * that seems like overkill.
-     *
-     * @ingroup api_addr_range
      */
     std::string to_string() const
     {
@@ -354,8 +329,6 @@ class AddrRange
      *
      * @param r Range to evaluate merging with
      * @return true if the two ranges would merge
-     *
-     * @ingroup api_addr_range
      */
     bool mergesWith(const AddrRange& r) const
     {
@@ -370,8 +343,6 @@ class AddrRange
      *
      * @param r Range to intersect with
      * @return true if the intersection of the two ranges is not empty
-     *
-     * @ingroup api_addr_range
      */
     bool intersects(const AddrRange& r) const
     {
@@ -404,8 +375,6 @@ class AddrRange
      *
      * @param r Range to compare with
      * @return true if the this range is a subset of the other one
-     *
-     * @ingroup api_addr_range
      */
     bool isSubset(const AddrRange& r) const
     {
@@ -429,8 +398,6 @@ class AddrRange
      *
      * @param a Address to compare with
      * @return true if the address is in the range
-     *
-     * @ingroup api_addr_range
      */
     bool contains(const Addr& a) const
     {
@@ -474,8 +441,6 @@ class AddrRange
      *
      * @param a the input address
      * @return the new address
-     *
-     * @ingroup api_addr_range
      */
     inline Addr removeIntlvBits(Addr a) const
     {
@@ -506,8 +471,6 @@ class AddrRange
     /**
      * This method adds the interleaving bits removed by
      * removeIntlvBits.
-     *
-     * @ingroup api_addr_range
      */
     inline Addr addIntlvBits(Addr a) const
     {
@@ -553,8 +516,6 @@ class AddrRange
      *
      * @param the input address
      * @return the flat offset in the address range
-     *
-     * @ingroup api_addr_range
      */
     Addr getOffset(const Addr& a) const
     {
@@ -575,8 +536,6 @@ class AddrRange
      *
      * @param r Range to compare with
      * @return true if the start address is less than that of the other range
-     *
-     * @ingroup api_addr_range
      */
     bool operator<(const AddrRange& r) const
     {
@@ -588,9 +547,6 @@ class AddrRange
             return intlvMatch < r.intlvMatch;
     }
 
-    /**
-     * @ingroup api_addr_range
-     */
     bool operator==(const AddrRange& r) const
     {
         if (_start != r._start)    return false;
@@ -601,9 +557,6 @@ class AddrRange
         return true;
     }
 
-    /**
-     * @ingroup api_addr_range
-     */
     bool operator!=(const AddrRange& r) const
     {
         return !(*this == r);
@@ -612,28 +565,17 @@ class AddrRange
 
 /**
  * Convenience typedef for a collection of address ranges
- *
- * @ingroup api_addr_range
  */
 typedef std::list<AddrRange> AddrRangeList;
 
-/**
- * @ingroup api_addr_range
- */
 inline AddrRange
 RangeEx(Addr start, Addr end)
 { return AddrRange(start, end); }
 
-/**
- * @ingroup api_addr_range
- */
 inline AddrRange
 RangeIn(Addr start, Addr end)
 { return AddrRange(start, end + 1); }
 
-/**
- * @ingroup api_addr_range
- */
 inline AddrRange
 RangeSize(Addr start, Addr size)
 { return AddrRange(start, start + size); }

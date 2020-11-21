@@ -30,7 +30,6 @@
 #define __ARCH_SPARC_DECODER_HH__
 
 #include "arch/generic/decode_cache.hh"
-#include "arch/generic/decoder.hh"
 #include "arch/sparc/registers.hh"
 #include "arch/types.hh"
 #include "cpu/static_inst.hh"
@@ -39,7 +38,7 @@ namespace SparcISA
 {
 
 class ISA;
-class Decoder : public InstDecoder
+class Decoder
 {
   protected:
     // The extended machine instruction being generated

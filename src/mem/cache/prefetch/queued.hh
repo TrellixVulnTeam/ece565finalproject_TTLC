@@ -101,13 +101,12 @@ class Queued : public Base
          * Create the associated memory packet
          * @param paddr physical address of this packet
          * @param blk_size block size used by the prefetcher
-         * @param requestor_id Requestor ID of the access that generated
-         * this prefetch
+         * @param mid Requester ID of the access that generated this prefetch
          * @param tag_prefetch flag to indicate if the packet needs to be
          *        tagged
          * @param t time when the prefetch becomes ready
          */
-        void createPkt(Addr paddr, unsigned blk_size, RequestorID requestor_id,
+        void createPkt(Addr paddr, unsigned blk_size, MasterID mid,
                        bool tag_prefetch, Tick t);
 
         /**
@@ -168,16 +167,13 @@ class Queued : public Base
     /** Percentage of requests that can be throttled */
     const unsigned int throttleControlPct;
 
-    struct QueuedStats : public Stats::Group
-    {
-        QueuedStats(Stats::Group *parent);
-        // STATS
-        Stats::Scalar pfIdentified;
-        Stats::Scalar pfBufferHit;
-        Stats::Scalar pfInCache;
-        Stats::Scalar pfRemovedFull;
-        Stats::Scalar pfSpanPage;
-    } statsQueued;
+    // STATS
+    Stats::Scalar pfIdentified;
+    Stats::Scalar pfBufferHit;
+    Stats::Scalar pfInCache;
+    Stats::Scalar pfRemovedFull;
+    Stats::Scalar pfSpanPage;
+
   public:
     using AddrPriority = std::pair<Addr, int32_t>;
 
@@ -196,6 +192,8 @@ class Queued : public Base
     {
         return pfq.empty() ? MaxTick : pfq.front().tick;
     }
+
+    void regStats() override;
 
   private:
 

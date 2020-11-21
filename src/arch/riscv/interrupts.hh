@@ -53,6 +53,7 @@ namespace RiscvISA {
 class Interrupts : public BaseInterrupts
 {
   private:
+    BaseCPU * cpu;
     std::bitset<NumInterruptTypes> ip;
     std::bitset<NumInterruptTypes> ie;
 
@@ -65,10 +66,12 @@ class Interrupts : public BaseInterrupts
         return dynamic_cast<const Params *>(_params);
     }
 
-    Interrupts(Params * p) : BaseInterrupts(p), ip(0), ie(0) {}
+    Interrupts(Params * p) : BaseInterrupts(p), cpu(nullptr), ip(0), ie(0) {}
+
+    void setCPU(BaseCPU * _cpu) { cpu = _cpu; }
 
     std::bitset<NumInterruptTypes>
-    globalMask() const
+    globalMask(ThreadContext *tc) const
     {
         INTERRUPT mask = 0;
         STATUS status = tc->readMiscReg(MISCREG_STATUS);
@@ -82,23 +85,23 @@ class Interrupts : public BaseInterrupts
     }
 
     bool checkInterrupt(int num) const { return ip[num] && ie[num]; }
-    bool checkInterrupts() const
+    bool checkInterrupts(ThreadContext *tc) const
     {
-        return (ip & ie & globalMask()).any();
+        return (ip & ie & globalMask(tc)).any();
     }
 
     Fault
-    getInterrupt()
+    getInterrupt(ThreadContext *tc)
     {
-        assert(checkInterrupts());
-        std::bitset<NumInterruptTypes> mask = globalMask();
+        assert(checkInterrupts(tc));
+        std::bitset<NumInterruptTypes> mask = globalMask(tc);
         for (int c = 0; c < NumInterruptTypes; c++)
             if (checkInterrupt(c) && mask[c])
                 return std::make_shared<InterruptFault>(c);
         return NoFault;
     }
 
-    void updateIntrInfo() {}
+    void updateIntrInfo(ThreadContext *tc) {}
 
     void
     post(int int_num, int index)

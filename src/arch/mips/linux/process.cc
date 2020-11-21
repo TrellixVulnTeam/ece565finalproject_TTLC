@@ -77,9 +77,10 @@ MipsLinuxObjectFileLoader loader;
 
 /// Target uname() handler.
 static SyscallReturn
-unameFunc(SyscallDesc *desc, ThreadContext *tc, VPtr<Linux::utsname> name)
+unameFunc(SyscallDesc *desc, ThreadContext *tc, Addr utsname)
 {
     auto process = tc->getProcessPtr();
+    TypedBufferArg<Linux::utsname> name(utsname);
 
     strcpy(name->sysname, "Linux");
     strcpy(name->nodename,"sim.gem5.org");
@@ -87,6 +88,7 @@ unameFunc(SyscallDesc *desc, ThreadContext *tc, VPtr<Linux::utsname> name)
     strcpy(name->version, "#1 Mon Aug 18 11:32:15 EDT 2003");
     strcpy(name->machine, "mips");
 
+    name.copyOut(tc->getVirtProxy());
     return 0;
 }
 
@@ -101,9 +103,10 @@ sys_getsysinfoFunc(SyscallDesc *desc, ThreadContext *tc, unsigned op,
       case 45:
         {
             // GSI_IEEE_FP_CONTROL
-            VPtr<uint64_t> fpcr(bufPtr, tc);
+            TypedBufferArg<uint64_t> fpcr(bufPtr);
             // I don't think this exactly matches the HW FPCR
             *fpcr = 0;
+            fpcr.copyOut(tc->getVirtProxy());
             return 0;
         }
       default:
@@ -125,10 +128,11 @@ sys_setsysinfoFunc(SyscallDesc *desc, ThreadContext *tc, unsigned op,
       case 14:
         {
             // SSI_IEEE_FP_CONTROL
-            ConstVPtr<uint64_t> fpcr(bufPtr, tc);
+            TypedBufferArg<uint64_t> fpcr(bufPtr);
             // I don't think this exactly matches the HW FPCR
+            fpcr.copyIn(tc->getVirtProxy());
             DPRINTFR(SyscallVerbose, "sys_setsysinfo(SSI_IEEE_FP_CONTROL): "
-                   " setting FPCR to 0x%x\n", letoh(*fpcr));
+                   " setting FPCR to 0x%x\n", letoh(*(uint64_t*)fpcr));
             return 0;
         }
       default:
@@ -476,8 +480,8 @@ MipsLinuxProcess::MipsLinuxProcess(ProcessParams * params,
 {}
 
 void
-MipsLinuxProcess::syscall(ThreadContext *tc)
+MipsLinuxProcess::syscall(ThreadContext *tc, Fault *fault)
 {
-    MipsProcess::syscall(tc);
-    syscallDescs.get(tc->readIntReg(2))->doSyscall(tc);
+    MipsProcess::syscall(tc, fault);
+    syscallDescs.get(tc->readIntReg(2))->doSyscall(tc, fault);
 }

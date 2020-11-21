@@ -44,10 +44,11 @@ import testlib.helper as helper
 import testlib.log as log
 import testlib.result as result
 import testlib.state as state
+import testlib.test_util as test
 import testlib.terminal as terminal
 
 from six.moves import queue as Queue
-from testlib.configuration import constants
+from testlib.configuration import config, constants
 
 
 class _TestStreamManager(object):
@@ -86,7 +87,7 @@ class _TestStreams(object):
         self.stdout.close()
         self.stderr.close()
 
-class ResultHandler(object):
+class ResultHandler(log.Handler):
     '''
     Log handler which listens for test results and output saving data as
     it is reported.
@@ -180,7 +181,7 @@ class ResultHandler(object):
 
 #TODO Change from a handler to an internal post processor so it can be used
 # to reprint results
-class SummaryHandler(object):
+class SummaryHandler(log.Handler):
     '''
     A log handler which listens to the log for test results
     and reports the aggregate results when closed.
@@ -193,6 +194,8 @@ class SummaryHandler(object):
             state.Result.Passed: color.Green,
             state.Result.Skipped: color.Cyan,
     }
+    sep_fmtkey = 'separator'
+    sep_fmtstr = '{%s}' % sep_fmtkey
 
     def __init__(self):
         self.mapping = {
@@ -247,7 +250,7 @@ class SummaryHandler(object):
                 string,
                 color=self.colormap[most_severe_outcome] + self.color.Bold)
 
-class TerminalHandler(object):
+class TerminalHandler(log.Handler):
     color = terminal.get_termcap()
     verbosity_mapping = {
         log.LogLevel.Warn: color.Yellow,
@@ -327,10 +330,22 @@ class TerminalHandler(object):
             return
         self.mapping.get(record.type_id, lambda _:None)(record)
 
+    def set_verbosity(self, verbosity):
+        self.verbosity = verbosity
+
+
+class PrintHandler(log.Handler):
+    def __init__(self):
+        pass
+
+    def handle(self, record):
+        print(str(record).rstrip())
+
     def close(self):
         pass
 
-class MultiprocessingHandlerWrapper(object):
+
+class MultiprocessingHandlerWrapper(log.Handler):
     '''
     A handler class which forwards log records to subhandlers, enabling
     logging across multiprocessing python processes.

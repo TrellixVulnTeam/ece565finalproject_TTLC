@@ -74,7 +74,8 @@ MemTraceProbe::MemTraceProbe(MemTraceProbeParams *p)
     // Register a callback to compensate for the destructor not
     // being called. The callback forces the stream to flush and
     // closes the output file.
-    registerExitCallback([this]() { closeStreams(); });
+    registerExitCallback(
+        new MakeCallback<MemTraceProbe, &MemTraceProbe::closeStreams>(this));
 }
 
 void
@@ -86,10 +87,10 @@ MemTraceProbe::startup()
     header_msg.set_obj_id(name());
     header_msg.set_tick_freq(SimClock::Frequency);
 
-    for (int i = 0; i < system->maxRequestors(); i++) {
+    for (int i = 0; i < system->maxMasters(); i++) {
         auto id_string = header_msg.add_id_strings();
         id_string->set_key(i);
-        id_string->set_value(system->getRequestorName(i));
+        id_string->set_value(system->getMasterName(i));
     }
 
     traceStream->write(header_msg);
@@ -114,7 +115,7 @@ MemTraceProbe::handleRequest(const ProbePoints::PacketInfo &pkt_info)
     pkt_msg.set_size(pkt_info.size);
     if (withPC && pkt_info.pc != 0)
         pkt_msg.set_pc(pkt_info.pc);
-    pkt_msg.set_pkt_id(pkt_info.id);
+    pkt_msg.set_pkt_id(pkt_info.master);
 
     traceStream->write(pkt_msg);
 }

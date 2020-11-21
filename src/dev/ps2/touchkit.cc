@@ -41,7 +41,6 @@
 #include "dev/ps2/touchkit.hh"
 
 #include "base/logging.hh"
-#include "base/trace.hh"
 #include "debug/PS2.hh"
 #include "dev/ps2/types.hh"
 #include "params/PS2TouchKit.hh"

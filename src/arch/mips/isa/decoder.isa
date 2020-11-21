@@ -159,14 +159,11 @@ decode OPCODE_HI default Unknown::unknown() {
                     0x2: movz({{ Rd = (Rt == 0) ? Rs : Rd; }});
                     0x3: movn({{ Rd = (Rt != 0) ? Rs : Rd; }});
                     0x4: decode FullSystemInt {
-                        0: syscall_se({{
-                            fault = std::make_shared<SESyscallFault>();
-                        }});
-                      default: syscall({{
-                            fault = std::make_shared<SystemCallFault>();
-                        }});
+                        0: syscall_se({{ xc->syscall(&fault); }},
+                                IsSerializeAfter, IsNonSpeculative);
+                      default: syscall({{ fault = std::make_shared<SystemCallFault>(); }});
                     }
-                    0x7: sync({{ ; }}, IsReadBarrier, IsWriteBarrier);
+                    0x7: sync({{ ; }}, IsMemBarrier);
                   0x5: break({{fault = std::make_shared<BreakpointFault>();}});
                 }
 
@@ -174,10 +171,10 @@ decode OPCODE_HI default Unknown::unknown() {
 
             0x2: decode FUNCTION_LO {
                 0x0: HiLoRsSelOp::mfhi({{ Rd = HI_RS_SEL; }},
-                             IntMultOp, IsSerializeBefore);
+                             IntMultOp, IsIprAccess);
                 0x1: HiLoRdSelOp::mthi({{ HI_RD_SEL = Rs; }});
                 0x2: HiLoRsSelOp::mflo({{ Rd = LO_RS_SEL; }},
-                             IntMultOp, IsSerializeBefore);
+                             IntMultOp, IsIprAccess);
                 0x3: HiLoRdSelOp::mtlo({{ LO_RD_SEL = Rs; }});
             }
 
@@ -719,7 +716,7 @@ decode OPCODE_HI default Unknown::unknown() {
                         LLFlag = 0;
                         Status = status;
                         SRSCtl = srsCtl;
-                    }}, IsReturn, IsSerializing);
+                    }}, IsReturn, IsSerializing, IsERET);
 
                     0x1F: deret({{
                         DebugReg debug = Debug;
@@ -732,7 +729,7 @@ decode OPCODE_HI default Unknown::unknown() {
                             // Undefined;
                         }
                         Debug = debug;
-                    }}, IsReturn, IsSerializing);
+                    }}, IsReturn, IsSerializing, IsERET);
                 }
                 format CP0TLB {
                     0x01: tlbr({{
@@ -1532,7 +1529,7 @@ decode OPCODE_HI default Unknown::unknown() {
                     if (Rs<2:0> == 0) {
                         Fd_ud = Fs_ud;
                     } else if (Rs<2:0> == 4) {
-                        if (GuestByteOrder == ByteOrder::big)
+                        if (GuestByteOrder == BigEndianByteOrder)
                             Fd_ud = Fs_ud<31:0> << 32 | Ft_ud<63:32>;
                         else
                             Fd_ud = Ft_ud<31:0> << 32 | Fs_ud<63:32>;

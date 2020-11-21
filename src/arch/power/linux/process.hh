@@ -42,7 +42,7 @@ class PowerLinuxProcess : public PowerProcess
 
     void initState() override;
 
-    void syscall(ThreadContext *tc) override;
+    void syscall(ThreadContext *tc, Fault *fault) override;
 
     /// Syscall descriptors, indexed by call number.
     static SyscallDescTable<SyscallABI> syscallDescs;

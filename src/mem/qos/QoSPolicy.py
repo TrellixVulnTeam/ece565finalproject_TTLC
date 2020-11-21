@@ -51,43 +51,36 @@ class QoSFixedPriorityPolicy(QoSPolicy):
     cxx_class = 'QoS::FixedPriorityPolicy'
 
     cxx_exports = [
-        PyBindMethod('initRequestorName'),
-        PyBindMethod('initRequestorObj'),
+        PyBindMethod('initMasterName'),
+        PyBindMethod('initMasterObj'),
     ]
 
-    _requestor_priorities = None
+    _mpriorities = None
 
-    def setRequestorPriority(self, request_port, priority):
-        if not self._requestor_priorities:
-            self._requestor_priorities = []
+    def setMasterPriority(self, master, priority):
+        if not self._mpriorities:
+            self._mpriorities = []
 
-        self._requestor_priorities.append([request_port, priority])
-
-    def setMasterPriority(self, request_port, priority):
-        warn('QosFixedPriority.setMasterPriority is deprecated in favor of '
-            'setRequestorPriority. See src/mem/qos/QoSPolicy.py for more '
-            'information')
-        self.setRequestorPriority(request_port, priority)
+        self._mpriorities.append([master, priority])
 
     def init(self):
-        if not self._requestor_priorities:
-            print("Error,"
-                 "use setRequestorPriority to init requestors/priorities\n");
+        if not self._mpriorities:
+            print("Error, use setMasterPriority to init masters/priorities\n");
             exit(1)
         else:
-            for prio in self._requestor_priorities:
-                request_port = prio[0]
-                priority = prio[1]
-                if isinstance(request_port, string_types):
-                    self.getCCObject().initRequestorName(
-                        request_port, int(priority))
+            for mprio in self._mpriorities:
+                master = mprio[0]
+                priority = mprio[1]
+                if isinstance(master, string_types):
+                    self.getCCObject().initMasterName(
+                        master, int(priority))
                 else:
-                    self.getCCObject().initRequestorObj(
-                        request_port.getCCObject(), priority)
+                    self.getCCObject().initMasterObj(
+                        master.getCCObject(), priority)
 
-    # default fixed priority value for non-listed Requestors
+    # default fixed priority value for non-listed Masters
     qos_fixed_prio_default_prio = Param.UInt8(0,
-        "Default priority for non-listed Requestors")
+        "Default priority for non-listed Masters")
 
 class QoSPropFairPolicy(QoSPolicy):
     type = 'QoSPropFairPolicy'
@@ -95,31 +88,31 @@ class QoSPropFairPolicy(QoSPolicy):
     cxx_class = 'QoS::PropFairPolicy'
 
     cxx_exports = [
-        PyBindMethod('initRequestorName'),
-        PyBindMethod('initRequestorObj'),
+        PyBindMethod('initMasterName'),
+        PyBindMethod('initMasterObj'),
     ]
 
-    _requestor_scores = None
+    _mscores = None
 
-    def setInitialScore(self, request_port, score):
-        if not self._requestor_scores:
-            self._requestor_scores = []
+    def setInitialScore(self, master, score):
+        if not self._mscores:
+            self._mscores = []
 
-        self._requestor_scores.append([request_port, score])
+        self._mscores.append([master, score])
 
     def init(self):
-        if not self._requestor_scores:
-            print("Error, use setInitialScore to init requestors/scores\n");
+        if not self._mscores:
+            print("Error, use setInitialScore to init masters/scores\n");
             exit(1)
         else:
-            for prio in self._requestor_scores:
-                request_port = prio[0]
-                score = prio[1]
-                if isinstance(request_port, string_types):
-                    self.getCCObject().initRequestorName(
-                        request_port, float(score))
+            for mprio in self._mscores:
+                master = mprio[0]
+                score = mprio[1]
+                if isinstance(master, string_types):
+                    self.getCCObject().initMasterName(
+                        master, float(score))
                 else:
-                    self.getCCObject().initRequestorObj(
-                        request_port.getCCObject(), float(score))
+                    self.getCCObject().initMasterObj(
+                        master.getCCObject(), float(score))
 
     weight = Param.Float(0.5, "Pf score weight")

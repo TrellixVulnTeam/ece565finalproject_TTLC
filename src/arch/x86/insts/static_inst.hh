@@ -87,7 +87,7 @@ namespace X86ISA
             }
 
         std::string generateDisassembly(
-                Addr pc, const Loader::SymbolTable *symtab) const override;
+                Addr pc, const Loader::SymbolTable *symtab) const;
 
         void printMnemonic(std::ostream &os, const char * mnemonic) const;
         void printMnemonic(std::ostream &os, const char * instMnemonic,
@@ -175,7 +175,7 @@ namespace X86ISA
         }
 
         void
-        advancePC(PCState &pcState) const override
+        advancePC(PCState &pcState) const
         {
             pcState.advance();
         }

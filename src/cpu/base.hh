@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2013, 2017, 2020 ARM Limited
+ * Copyright (c) 2011-2013, 2017 ARM Limited
  * All rights reserved
  *
  * The license below extends only to copyright in the software and shall
@@ -48,11 +48,12 @@
 // and if so stop here
 #include "config/the_isa.hh"
 #if THE_ISA == NULL_ISA
-#error Including BaseCPU in a system without CPU support
+#include "arch/null/cpu_dummy.hh"
 #else
 #include "arch/generic/interrupts.hh"
+#include "arch/isa_traits.hh"
+#include "arch/microcode_rom.hh"
 #include "base/statistics.hh"
-#include "mem/port_proxy.hh"
 #include "sim/clocked_object.hh"
 #include "sim/eventq.hh"
 #include "sim/full_system.hh"
@@ -123,10 +124,10 @@ class BaseCPU : public ClockedObject
     const uint32_t _socketId;
 
     /** instruction side request id that must be placed in all requests */
-    RequestorID _instRequestorId;
+    MasterID _instMasterId;
 
     /** data side request id that must be placed in all requests */
-    RequestorID _dataRequestorId;
+    MasterID _dataMasterId;
 
     /** An intrenal representation of a task identifier within gem5. This is
      * used so the CPU can add which taskId (which is an internal representation
@@ -145,23 +146,6 @@ class BaseCPU : public ClockedObject
     /** Cache the cache line size that we get from the system */
     const unsigned int _cacheLineSize;
 
-    /** Global CPU statistics that are merged into the Root object. */
-    struct GlobalStats : public Stats::Group {
-        GlobalStats(::Stats::Group *parent);
-
-        ::Stats::Value simInsts;
-        ::Stats::Value simOps;
-
-        ::Stats::Formula hostInstRate;
-        ::Stats::Formula hostOpRate;
-    };
-
-    /**
-     * Pointer to the global stat structure. This needs to be
-     * constructed from regStats since we merge it into the root
-     * group. */
-    static std::unique_ptr<GlobalStats> globalStats;
-
   public:
 
     /**
@@ -178,7 +162,7 @@ class BaseCPU : public ClockedObject
     virtual PortProxy::SendFunctionalFunc
     getSendFunctional()
     {
-        auto port = dynamic_cast<RequestPort *>(&getDataPort());
+        auto port = dynamic_cast<MasterPort *>(&getDataPort());
         assert(port);
         return [port](PacketPtr pkt)->void { port->sendFunctional(pkt); };
     }
@@ -198,9 +182,9 @@ class BaseCPU : public ClockedObject
     uint32_t socketId() const { return _socketId; }
 
     /** Reads this CPU's unique data requestor ID */
-    RequestorID dataRequestorId() const { return _dataRequestorId; }
+    MasterID dataMasterId() const { return _dataMasterId; }
     /** Reads this CPU's unique instruction requestor ID */
-    RequestorID instRequestorId() const { return _instRequestorId; }
+    MasterID instMasterId() const { return _instMasterId; }
 
     /**
      * Get a port on this CPU. All CPUs have a data and
@@ -228,6 +212,8 @@ class BaseCPU : public ClockedObject
     // @todo remove me after debugging with legion done
     Tick instCount() { return instCnt; }
 
+    TheISA::MicrocodeRom microcodeRom;
+
   protected:
     std::vector<BaseInterrupts*> interrupts;
 
@@ -245,7 +231,12 @@ class BaseCPU : public ClockedObject
     virtual void wakeup(ThreadID tid) = 0;
 
     void
-    postInterrupt(ThreadID tid, int int_num, int index);
+    postInterrupt(ThreadID tid, int int_num, int index)
+    {
+        interrupts[tid]->post(int_num, index);
+        if (FullSystem)
+            wakeup(tid);
+    }
 
     void
     clearInterrupt(ThreadID tid, int int_num, int index)
@@ -260,10 +251,13 @@ class BaseCPU : public ClockedObject
     }
 
     bool
-    checkInterrupts(ThreadID tid) const
+    checkInterrupts(ThreadContext *tc) const
     {
-        return FullSystem && interrupts[tid]->checkInterrupts();
+        return FullSystem && interrupts[tc->threadId()]->checkInterrupts(tc);
     }
+
+    void processProfileEvent();
+    EventFunctionWrapper * profileEvent;
 
   protected:
     std::vector<ThreadContext *> threadContexts;

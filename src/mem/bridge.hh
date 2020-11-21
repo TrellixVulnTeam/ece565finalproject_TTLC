@@ -40,8 +40,8 @@
 
 /**
  * @file
- * Declaration of a memory-mapped bridge that connects a requestor
- * and a responder through a request and response queue.
+ * Declaration of a memory-mapped bridge that connects a master
+ * and a slave through a request and response queue.
  */
 
 #ifndef __MEM_BRIDGE_HH__
@@ -56,11 +56,11 @@
 
 /**
  * A bridge is used to interface two different crossbars (or in general a
- * memory-mapped requestor and responder), with buffering for requests and
+ * memory-mapped master and slave), with buffering for requests and
  * responses. The bridge has a fixed delay for packets passing through
  * it and responds to a fixed set of address ranges.
  *
- * The bridge comprises a response port and a request port, that buffer
+ * The bridge comprises a slave port and a master port, that buffer
  * outgoing responses and requests respectively. Buffer space is
  * reserved when a request arrives, also reserving response space
  * before forwarding the request. If there is no space present, then
@@ -87,16 +87,16 @@ class Bridge : public ClockedObject
         { }
     };
 
-    // Forward declaration to allow the response port to have a pointer
-    class BridgeRequestPort;
+    // Forward declaration to allow the slave port to have a pointer
+    class BridgeMasterPort;
 
     /**
      * The port on the side that receives requests and sends
-     * responses. The response port has a set of address ranges that it
-     * is responsible for. The response port also has a buffer for the
+     * responses. The slave port has a set of address ranges that it
+     * is responsible for. The slave port also has a buffer for the
      * responses not yet sent.
      */
-    class BridgeResponsePort : public ResponsePort
+    class BridgeSlavePort : public SlavePort
     {
 
       private:
@@ -105,9 +105,9 @@ class Bridge : public ClockedObject
         Bridge& bridge;
 
         /**
-         * Request port on the other side of the bridge.
+         * Master port on the other side of the bridge.
          */
-        BridgeRequestPort& memSidePort;
+        BridgeMasterPort& masterPort;
 
         /** Minimum request delay though this bridge. */
         const Cycles delay;
@@ -158,18 +158,17 @@ class Bridge : public ClockedObject
       public:
 
         /**
-         * Constructor for the BridgeResponsePort.
+         * Constructor for the BridgeSlavePort.
          *
          * @param _name the port name including the owner
          * @param _bridge the structural owner
-         * @param _memSidePort the request port on the other
-         *                       side of the bridge
+         * @param _masterPort the master port on the other side of the bridge
          * @param _delay the delay in cycles from receiving to sending
          * @param _resp_limit the size of the response queue
          * @param _ranges a number of address ranges to forward
          */
-        BridgeResponsePort(const std::string& _name, Bridge& _bridge,
-                        BridgeRequestPort& _memSidePort, Cycles _delay,
+        BridgeSlavePort(const std::string& _name, Bridge& _bridge,
+                        BridgeMasterPort& _masterPort, Cycles _delay,
                         int _resp_limit, std::vector<AddrRange> _ranges);
 
         /**
@@ -214,10 +213,10 @@ class Bridge : public ClockedObject
 
     /**
      * Port on the side that forwards requests and receives
-     * responses. The request port has a buffer for the requests not
+     * responses. The master port has a buffer for the requests not
      * yet sent.
      */
-    class BridgeRequestPort : public RequestPort
+    class BridgeMasterPort : public MasterPort
     {
 
       private:
@@ -226,9 +225,9 @@ class Bridge : public ClockedObject
         Bridge& bridge;
 
         /**
-         * The response port on the other side of the bridge.
+         * The slave port on the other side of the bridge.
          */
-        BridgeResponsePort& cpuSidePort;
+        BridgeSlavePort& slavePort;
 
         /** Minimum delay though this bridge. */
         const Cycles delay;
@@ -257,17 +256,16 @@ class Bridge : public ClockedObject
       public:
 
         /**
-         * Constructor for the BridgeRequestPort.
+         * Constructor for the BridgeMasterPort.
          *
          * @param _name the port name including the owner
          * @param _bridge the structural owner
-         * @param _cpuSidePort the response port on the other side of
-         * the bridge
+         * @param _slavePort the slave port on the other side of the bridge
          * @param _delay the delay in cycles from receiving to sending
          * @param _req_limit the size of the request queue
          */
-        BridgeRequestPort(const std::string& _name, Bridge& _bridge,
-                         BridgeResponsePort& _cpuSidePort, Cycles _delay,
+        BridgeMasterPort(const std::string& _name, Bridge& _bridge,
+                         BridgeSlavePort& _slavePort, Cycles _delay,
                          int _req_limit);
 
         /**
@@ -307,11 +305,11 @@ class Bridge : public ClockedObject
         void recvReqRetry();
     };
 
-    /** Response port of the bridge. */
-    BridgeResponsePort cpuSidePort;
+    /** Slave port of the bridge. */
+    BridgeSlavePort slavePort;
 
-    /** Request port of the bridge. */
-    BridgeRequestPort memSidePort;
+    /** Master port of the bridge. */
+    BridgeMasterPort masterPort;
 
   public:
 

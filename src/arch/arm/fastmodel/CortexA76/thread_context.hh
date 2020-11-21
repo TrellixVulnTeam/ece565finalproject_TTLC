@@ -48,7 +48,7 @@ class CortexA76TC : public Iris::ThreadContext
 
   public:
     CortexA76TC(::BaseCPU *cpu, int id, System *system,
-                ::BaseTLB *dtb, ::BaseTLB *itb, ::BaseISA *isa,
+                ::BaseTLB *dtb, ::BaseTLB *itb,
                 iris::IrisConnectionInterface *iris_if,
                 const std::string &iris_path);
 

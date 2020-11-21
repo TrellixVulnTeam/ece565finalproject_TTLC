@@ -71,10 +71,8 @@ using namespace std;
 
 PhysicalMemory::PhysicalMemory(const string& _name,
                                const vector<AbstractMemory*>& _memories,
-                               bool mmap_using_noreserve,
-                               const std::string& shared_backstore) :
-    _name(_name), size(0), mmapUsingNoReserve(mmap_using_noreserve),
-    sharedBackstore(shared_backstore)
+                               bool mmap_using_noreserve) :
+    _name(_name), size(0), mmapUsingNoReserve(mmap_using_noreserve)
 {
     if (mmap_using_noreserve)
         warn("Not reserving swap space. May cause SIGSEGV on actual usage\n");
@@ -194,23 +192,7 @@ PhysicalMemory::createBackingStore(AddrRange range,
     // perform the actual mmap
     DPRINTF(AddrRanges, "Creating backing store for range %s with size %d\n",
             range.to_string(), range.size());
-
-    int shm_fd;
-    int map_flags;
-
-    if (sharedBackstore.empty()) {
-        shm_fd = -1;
-        map_flags =  MAP_ANON | MAP_PRIVATE;
-    } else {
-        DPRINTF(AddrRanges, "Sharing backing store as %s\n",
-                sharedBackstore.c_str());
-        shm_fd = shm_open(sharedBackstore.c_str(), O_CREAT | O_RDWR, 0666);
-        if (shm_fd == -1)
-               panic("Shared memory failed");
-        if (ftruncate(shm_fd, range.size()))
-               panic("Setting size of shared memory failed");
-        map_flags = MAP_SHARED;
-    }
+    int map_flags = MAP_ANON | MAP_PRIVATE;
 
     // to be able to simulate very large memories, the user can opt to
     // pass noreserve to mmap
@@ -220,7 +202,7 @@ PhysicalMemory::createBackingStore(AddrRange range,
 
     uint8_t* pmem = (uint8_t*) mmap(NULL, range.size(),
                                     PROT_READ | PROT_WRITE,
-                                    map_flags, shm_fd, 0);
+                                    map_flags, -1, 0);
 
     if (pmem == (uint8_t*) MAP_FAILED) {
         perror("mmap");

@@ -51,14 +51,13 @@ output header {{
                 GenericISA::M5DebugFault *_fault);
 
         Fault
-        execute(ExecContext *xc, Trace::InstRecord *traceData) const override
+        execute(ExecContext *xc, Trace::InstRecord *traceData) const
         {
             return fault;
         }
 
         std::string
-        generateDisassembly(Addr pc,
-                            const Loader::SymbolTable *symtab) const override
+        generateDisassembly(Addr pc, const Loader::SymbolTable *symtab) const
         {
             std::stringstream response;
 
@@ -79,7 +78,7 @@ output header {{
                 const char *instMnem, uint64_t setFlags,
                 GenericISA::M5DebugFault *_fault, uint8_t _cc);
 
-        Fault execute(ExecContext *, Trace::InstRecord *) const override;
+        Fault execute(ExecContext *, Trace::InstRecord *) const;
     };
 }};
 

@@ -40,11 +40,11 @@ FsWorkload::initState()
 {
     Workload::initState();
 
-    if (system->threads.empty())
+    if (system->threadContexts.empty())
         return;
 
     // Other CPUs will get activated by IPIs.
-    auto *tc = system->threads[0];
+    auto *tc = system->threadContexts[0];
     SparcISA::PowerOnReset().invoke(tc);
     tc->activate();
 }

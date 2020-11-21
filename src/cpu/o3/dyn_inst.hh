@@ -44,6 +44,7 @@
 
 #include <array>
 
+#include "arch/isa_traits.hh"
 #include "config/the_isa.hh"
 #include "cpu/o3/cpu.hh"
 #include "cpu/o3/isa_specific.hh"
@@ -247,6 +248,9 @@ class BaseO3DynInst : public BaseDynInst<Impl>
     }
     /** Traps to handle specified fault. */
     void trap(const Fault &fault);
+
+    /** Emulates a syscall. */
+    void syscall(Fault *fault) override;
 
   public:
 

@@ -46,8 +46,10 @@
 #include "base/trace.hh"
 #include "config/the_isa.hh"
 #include "cpu/base.hh"
+#include "cpu/quiesce_event.hh"
 #include "debug/Context.hh"
 #include "debug/Quiesce.hh"
+#include "kern/kernel_stats.hh"
 #include "params/BaseCPU.hh"
 #include "sim/full_system.hh"
 
@@ -128,14 +130,34 @@ ThreadContext::compare(ThreadContext *one, ThreadContext *two)
 void
 ThreadContext::quiesce()
 {
-    getSystemPtr()->threads.quiesce(contextId());
+    if (!getCpuPtr()->params()->do_quiesce)
+        return;
+
+    DPRINTF(Quiesce, "%s: quiesce()\n", getCpuPtr()->name());
+
+    suspend();
+    if (getKernelStats())
+        getKernelStats()->quiesce();
 }
 
 
 void
 ThreadContext::quiesceTick(Tick resume)
 {
-    getSystemPtr()->threads.quiesceTick(contextId(), resume);
+    BaseCPU *cpu = getCpuPtr();
+
+    if (!cpu->params()->do_quiesce)
+        return;
+
+    EndQuiesceEvent *quiesceEvent = getQuiesceEvent();
+
+    cpu->reschedule(quiesceEvent, resume, true);
+
+    DPRINTF(Quiesce, "%s: quiesceTick until %lu\n", cpu->name(), resume);
+
+    suspend();
+    if (getKernelStats())
+        getKernelStats()->quiesce();
 }
 
 void
@@ -232,8 +254,26 @@ takeOverFrom(ThreadContext &ntc, ThreadContext &otc)
     ntc.setContextId(otc.contextId());
     ntc.setThreadId(otc.threadId());
 
-    if (FullSystem)
+    if (FullSystem) {
         assert(ntc.getSystemPtr() == otc.getSystemPtr());
+
+        BaseCPU *ncpu(ntc.getCpuPtr());
+        assert(ncpu);
+        EndQuiesceEvent *oqe(otc.getQuiesceEvent());
+        assert(oqe);
+        assert(oqe->tc == &otc);
+
+        BaseCPU *ocpu(otc.getCpuPtr());
+        assert(ocpu);
+        EndQuiesceEvent *nqe(ntc.getQuiesceEvent());
+        assert(nqe);
+        assert(nqe->tc == &ntc);
+
+        if (oqe->scheduled()) {
+            ncpu->schedule(nqe, oqe->when());
+            ocpu->deschedule(oqe);
+        }
+    }
 
     otc.setStatus(ThreadContext::Halted);
 }

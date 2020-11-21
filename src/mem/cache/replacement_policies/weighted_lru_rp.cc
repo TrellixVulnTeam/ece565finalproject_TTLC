@@ -36,7 +36,6 @@
 #include <cassert>
 
 #include "params/WeightedLRURP.hh"
-#include "sim/core.hh"
 
 WeightedLRUPolicy::WeightedLRUPolicy(const Params* p)
     : BaseReplacementPolicy(p)

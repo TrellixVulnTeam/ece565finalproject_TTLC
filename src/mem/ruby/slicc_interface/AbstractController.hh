@@ -147,7 +147,6 @@ class AbstractController : public ClockedObject, public Consumer
 
   public:
     MachineID getMachineID() const { return m_machineID; }
-    RequestorID getRequestorId() const { return m_id; }
 
     Stats::Histogram& getDelayHist() { return m_delayHistogram; }
     Stats::Histogram& getDelayVCHist(uint32_t index)
@@ -185,8 +184,8 @@ class AbstractController : public ClockedObject, public Consumer
     MachineID m_machineID;
     const NodeID m_clusterID;
 
-    // RequestorID used by some components of gem5.
-    const RequestorID m_id;
+    // MasterID used by some components of gem5.
+    const MasterID m_masterId;
 
     Network *m_net_ptr;
     bool m_is_blocking;
@@ -214,30 +213,44 @@ class AbstractController : public ClockedObject, public Consumer
     Stats::Histogram m_delayHistogram;
     std::vector<Stats::Histogram *> m_delayVCHistogram;
 
-    /**
-     * Port that forwards requests and receives responses from the
-     * memory controller.
-     */
-    class MemoryPort : public RequestPort
+    //! Callback class used for collating statistics from all the
+    //! controller of this type.
+    class StatsCallback : public Callback
     {
       private:
+        AbstractController *ctr;
+
+      public:
+        virtual ~StatsCallback() {}
+        StatsCallback(AbstractController *_ctr) : ctr(_ctr) {}
+        void process() {ctr->collateStats();}
+    };
+
+    /**
+     * Port that forwards requests and receives responses from the
+     * memory controller.  It has a queue of packets not yet sent.
+     */
+    class MemoryPort : public QueuedMasterPort
+    {
+      private:
+        // Packet queues used to store outgoing requests and snoop responses.
+        ReqPacketQueue reqQueue;
+        SnoopRespPacketQueue snoopRespQueue;
+
         // Controller that operates this port.
         AbstractController *controller;
 
       public:
         MemoryPort(const std::string &_name, AbstractController *_controller,
-                   PortID id = InvalidPortID);
+                   const std::string &_label);
 
-      protected:
         // Function for receiving a timing response from the peer port.
         // Currently the pkt is handed to the coherence controller
         // associated with this port.
         bool recvTimingResp(PacketPtr pkt);
-
-        void recvReqRetry();
     };
 
-    /* Request port to the memory controller. */
+    /* Master port to the memory controller. */
     MemoryPort memoryPort;
 
     // State that is stored in packets sent to the memory controller.

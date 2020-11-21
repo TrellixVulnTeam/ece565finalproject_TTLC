@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018-2020 Inria
+ * Copyright (c) 2018-2019 Inria
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -35,12 +35,9 @@
 
 #include <algorithm>
 
-#include "base/trace.hh"
 #include "debug/CacheComp.hh"
 #include "mem/cache/compressors/dictionary_compressor.hh"
 #include "params/BaseDictionaryCompressor.hh"
-
-namespace Compressor {
 
 template <class T>
 DictionaryCompressor<T>::CompData::CompData()
@@ -80,13 +77,6 @@ DictionaryCompressor<T>::resetDictionary()
 }
 
 template <typename T>
-std::unique_ptr<typename DictionaryCompressor<T>::CompData>
-DictionaryCompressor<T>::instantiateDictionaryCompData() const
-{
-    return std::unique_ptr<DictionaryCompressor<T>::CompData>(new CompData());
-}
-
-template <typename T>
 std::unique_ptr<typename DictionaryCompressor<T>::Pattern>
 DictionaryCompressor<T>::compressValue(const T data)
 {
@@ -111,7 +101,7 @@ DictionaryCompressor<T>::compressValue(const T data)
     }
 
     // Update stats
-    dictionaryStats.patterns[pattern->getPatternNumber()]++;
+    patternStats[pattern->getPatternNumber()]++;
 
     // Push into dictionary
     if (pattern->shouldAllocate()) {
@@ -122,18 +112,19 @@ DictionaryCompressor<T>::compressValue(const T data)
 }
 
 template <class T>
-std::unique_ptr<Base::CompressionData>
-DictionaryCompressor<T>::compress(const std::vector<Chunk>& chunks)
+std::unique_ptr<BaseCacheCompressor::CompressionData>
+DictionaryCompressor<T>::compress(const uint64_t* data)
 {
-    std::unique_ptr<Base::CompressionData> comp_data =
-        instantiateDictionaryCompData();
+    std::unique_ptr<BaseCacheCompressor::CompressionData> comp_data =
+        std::unique_ptr<CompData>(new CompData());
 
     // Reset dictionary
     resetDictionary();
 
     // Compress every value sequentially
     CompData* const comp_data_ptr = static_cast<CompData*>(comp_data.get());
-    for (const auto& value : chunks) {
+    const std::vector<T> values((T*)data, (T*)data + blkSize / sizeof(T));
+    for (const auto& value : values) {
         std::unique_ptr<Pattern> pattern = compressValue(value);
         DPRINTF(CacheComp, "Compressed %016x to %s\n", value,
             pattern->print());
@@ -216,7 +207,5 @@ DictionaryCompressor<T>::fromDictionaryEntry(const DictionaryEntry& entry)
     }
     return value;
 }
-
-} // namespace Compressor
 
 #endif //__MEM_CACHE_COMPRESSORS_DICTIONARY_COMPRESSOR_IMPL_HH__

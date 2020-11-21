@@ -65,7 +65,7 @@
  * same trace is used for playback on different memory sub-systems.
  *
  * The TraceCPU inherits from BaseCPU so some virtual methods need to be
- * defined. It has two port subclasses inherited from RequestPort for
+ * defined. It has two port subclasses inherited from MasterPort for
  * instruction and data ports. It issues the memory requests deducing the
  * timing from the trace and without performing real execution of micro-ops. As
  * soon as the last dependency for an instruction is complete, its
@@ -166,7 +166,7 @@ class TraceCPU : public BaseCPU
      */
     Counter totalOps() const
     {
-        return traceStats.numOps.value();
+        return numOps.value();
     }
 
     /*
@@ -221,12 +221,12 @@ class TraceCPU : public BaseCPU
     /**
      * IcachePort class that interfaces with L1 Instruction Cache.
      */
-    class IcachePort : public RequestPort
+    class IcachePort : public MasterPort
     {
       public:
         /** Default constructor. */
         IcachePort(TraceCPU* _cpu)
-            : RequestPort(_cpu->name() + ".icache_port", _cpu),
+            : MasterPort(_cpu->name() + ".icache_port", _cpu),
                          owner(_cpu)
         { }
 
@@ -261,13 +261,13 @@ class TraceCPU : public BaseCPU
     /**
      * DcachePort class that interfaces with L1 Data Cache.
      */
-    class DcachePort : public RequestPort
+    class DcachePort : public MasterPort
     {
 
       public:
         /** Default constructor. */
         DcachePort(TraceCPU* _cpu)
-            : RequestPort(_cpu->name() + ".dcache_port", _cpu),
+            : MasterPort(_cpu->name() + ".dcache_port", _cpu),
                          owner(_cpu)
         { }
 
@@ -321,11 +321,11 @@ class TraceCPU : public BaseCPU
     /** Port to connect to L1 data cache. */
     DcachePort dcachePort;
 
-    /** Requestor id for instruction read requests. */
-    const RequestorID instRequestorID;
+    /** Master id for instruction read requests. */
+    const MasterID instMasterID;
 
-    /** Requestor id for data read and write requests. */
-    const RequestorID dataRequestorID;
+    /** Master id for data read and write requests. */
+    const MasterID dataMasterID;
 
     /** File names for input instruction and data traces. */
     std::string instTraceFile, dataTraceFile;
@@ -423,16 +423,16 @@ class TraceCPU : public BaseCPU
         public:
         /* Constructor */
         FixedRetryGen(TraceCPU& _owner, const std::string& _name,
-                   RequestPort& _port, RequestorID requestor_id,
+                   MasterPort& _port, MasterID master_id,
                    const std::string& trace_file)
             : owner(_owner),
               port(_port),
-              requestorId(requestor_id),
+              masterID(master_id),
               trace(trace_file),
-              genName(owner.name() + ".fixedretry." + _name),
+              genName(owner.name() + ".fixedretry" + _name),
               retryPkt(nullptr),
               delta(0),
-              traceComplete(false), fixedStats(&_owner, _name)
+              traceComplete(false)
         {
         }
 
@@ -493,6 +493,7 @@ class TraceCPU : public BaseCPU
 
         int64_t tickDelta() { return delta; }
 
+        void regStats();
 
       private:
 
@@ -500,10 +501,10 @@ class TraceCPU : public BaseCPU
         TraceCPU& owner;
 
         /** Reference of the port to be used to issue memory requests. */
-        RequestPort& port;
+        MasterPort& port;
 
-        /** RequestorID used for the requests being sent. */
-        const RequestorID requestorId;
+        /** MasterID used for the requests being sent. */
+        const MasterID masterID;
 
         /** Input stream used for reading the input trace file. */
         InputStream trace;
@@ -528,20 +529,14 @@ class TraceCPU : public BaseCPU
 
         /** Store an element read from the trace to send as the next packet. */
         TraceElement currElement;
-      protected:
-        struct FixedRetryGenStatGroup : public Stats::Group
-        {
-            /** name is the extension to the name for these stats */
-            FixedRetryGenStatGroup(Stats::Group *parent,
-                                   const std::string& _name);
-            /** Stats for instruction accesses replayed. */
-            Stats::Scalar numSendAttempted;
-            Stats::Scalar numSendSucceeded;
-            Stats::Scalar numSendFailed;
-            Stats::Scalar numRetrySucceeded;
-            /** Last simulated tick by the FixedRetryGen */
-            Stats::Scalar instLastTick;
-        } fixedStats;
+
+        /** Stats for instruction accesses replayed. */
+        Stats::Scalar numSendAttempted;
+        Stats::Scalar numSendSucceeded;
+        Stats::Scalar numSendFailed;
+        Stats::Scalar numRetrySucceeded;
+        /** Last simulated tick by the FixedRetryGen */
+        Stats::Scalar instLastTick;
 
     };
 
@@ -852,20 +847,20 @@ class TraceCPU : public BaseCPU
         public:
         /* Constructor */
         ElasticDataGen(TraceCPU& _owner, const std::string& _name,
-                   RequestPort& _port, RequestorID requestor_id,
+                   MasterPort& _port, MasterID master_id,
                    const std::string& trace_file, TraceCPUParams *params)
             : owner(_owner),
               port(_port),
-              requestorId(requestor_id),
+              masterID(master_id),
               trace(trace_file, 1.0 / params->freqMultiplier),
-              genName(owner.name() + ".elastic." + _name),
+              genName(owner.name() + ".elastic" + _name),
               retryPkt(nullptr),
               traceComplete(false),
               nextRead(false),
               execComplete(false),
               windowSize(trace.getWindowSize()),
               hwResource(params->sizeROB, params->sizeStoreBuffer,
-                         params->sizeLoadBuffer), elasticStats(&_owner, _name)
+                         params->sizeLoadBuffer)
         {
             DPRINTF(TraceCPUData, "Window size in the trace is %d.\n",
                     windowSize);
@@ -981,6 +976,7 @@ class TraceCPU : public BaseCPU
         /** Get number of micro-ops modelled in the TraceCPU replay */
         uint64_t getMicroOpCount() const { return trace.getMicroOpCount(); }
 
+        void regStats();
 
       private:
 
@@ -988,10 +984,10 @@ class TraceCPU : public BaseCPU
         TraceCPU& owner;
 
         /** Reference of the port to be used to issue memory requests. */
-        RequestPort& port;
+        MasterPort& port;
 
-        /** RequestorID used for the requests being sent. */
-        const RequestorID requestorId;
+        /** MasterID used for the requests being sent. */
+        const MasterID masterID;
 
         /** Input stream used for reading the input trace file. */
         InputStream trace;
@@ -1043,26 +1039,18 @@ class TraceCPU : public BaseCPU
         /** List of nodes that are ready to execute */
         std::list<ReadyNode> readyList;
 
-      protected:
-        // Defining the a stat group
-        struct ElasticDataGenStatGroup : public Stats::Group
-        {
-            /** name is the extension to the name for these stats */
-            ElasticDataGenStatGroup(Stats::Group *parent,
-                                    const std::string& _name);
-            /** Stats for data memory accesses replayed. */
-            Stats::Scalar maxDependents;
-            Stats::Scalar maxReadyListSize;
-            Stats::Scalar numSendAttempted;
-            Stats::Scalar numSendSucceeded;
-            Stats::Scalar numSendFailed;
-            Stats::Scalar numRetrySucceeded;
-            Stats::Scalar numSplitReqs;
-            Stats::Scalar numSOLoads;
-            Stats::Scalar numSOStores;
-            /** Tick when ElasticDataGen completes execution */
-            Stats::Scalar dataLastTick;
-        } elasticStats;
+        /** Stats for data memory accesses replayed. */
+        Stats::Scalar maxDependents;
+        Stats::Scalar maxReadyListSize;
+        Stats::Scalar numSendAttempted;
+        Stats::Scalar numSendSucceeded;
+        Stats::Scalar numSendFailed;
+        Stats::Scalar numRetrySucceeded;
+        Stats::Scalar numSplitReqs;
+        Stats::Scalar numSOLoads;
+        Stats::Scalar numSOStores;
+        /** Tick when ElasticDataGen completes execution */
+        Stats::Scalar dataLastTick;
     };
 
     /** Instance of FixedRetryGen to replay instruction read requests. */
@@ -1139,18 +1127,14 @@ class TraceCPU : public BaseCPU
      * message is printed.
      */
     uint64_t progressMsgThreshold;
-    struct TraceStats : public Stats::Group
-    {
-        TraceStats(TraceCPU *trace);
-        Stats::Scalar numSchedDcacheEvent;
-        Stats::Scalar numSchedIcacheEvent;
 
-        /** Stat for number of simulated micro-ops. */
-        Stats::Scalar numOps;
-        /** Stat for the CPI. This is really cycles per
-         *  micro-op and not inst. */
-        Stats::Formula cpi;
-    } traceStats;
+    Stats::Scalar numSchedDcacheEvent;
+    Stats::Scalar numSchedIcacheEvent;
+
+    /** Stat for number of simulated micro-ops. */
+    Stats::Scalar numOps;
+    /** Stat for the CPI. This is really cycles per micro-op and not inst. */
+    Stats::Formula cpi;
 
   public:
 
@@ -1160,5 +1144,6 @@ class TraceCPU : public BaseCPU
     /** Used to get a reference to the dcache port. */
     Port &getDataPort() { return dcachePort; }
 
+    void regStats();
 };
 #endif // __CPU_TRACE_TRACE_CPU_HH__

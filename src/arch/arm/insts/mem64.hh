@@ -72,7 +72,7 @@ class MightBeMicro64 : public ArmStaticInst
     {}
 
     void
-    advancePC(PCState &pcState) const override
+    advancePC(PCState &pcState) const
     {
         if (flags[IsLastMicroop]) {
             pcState.uEnd();

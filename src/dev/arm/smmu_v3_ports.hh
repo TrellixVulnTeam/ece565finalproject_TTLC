@@ -42,9 +42,9 @@
 #include "mem/tport.hh"
 
 class SMMUv3;
-class SMMUv3DeviceInterface;
+class SMMUv3SlaveInterface;
 
-class SMMURequestPort : public RequestPort
+class SMMUMasterPort : public MasterPort
 {
   protected:
     SMMUv3 &smmu;
@@ -53,12 +53,12 @@ class SMMURequestPort : public RequestPort
     virtual void recvReqRetry();
 
   public:
-    SMMURequestPort(const std::string &_name, SMMUv3 &_smmu);
-    virtual ~SMMURequestPort() {}
+    SMMUMasterPort(const std::string &_name, SMMUv3 &_smmu);
+    virtual ~SMMUMasterPort() {}
 };
 
-// Separate request port to send MMU initiated requests on
-class SMMUTableWalkPort : public RequestPort
+// Separate master port to send MMU initiated requests on
+class SMMUMasterTableWalkPort : public MasterPort
 {
   protected:
     SMMUv3 &smmu;
@@ -67,14 +67,14 @@ class SMMUTableWalkPort : public RequestPort
     virtual void recvReqRetry();
 
   public:
-    SMMUTableWalkPort(const std::string &_name, SMMUv3 &_smmu);
-    virtual ~SMMUTableWalkPort() {}
+    SMMUMasterTableWalkPort(const std::string &_name, SMMUv3 &_smmu);
+    virtual ~SMMUMasterTableWalkPort() {}
 };
 
-class SMMUDevicePort : public QueuedResponsePort
+class SMMUSlavePort : public QueuedSlavePort
 {
   protected:
-    SMMUv3DeviceInterface &ifc;
+    SMMUv3SlaveInterface &ifc;
     RespPacketQueue respQueue;
 
     virtual void recvFunctional(PacketPtr pkt);
@@ -82,10 +82,10 @@ class SMMUDevicePort : public QueuedResponsePort
     virtual bool recvTimingReq(PacketPtr pkt);
 
   public:
-    SMMUDevicePort(const std::string &_name,
-                  SMMUv3DeviceInterface &_ifc,
+    SMMUSlavePort(const std::string &_name,
+                  SMMUv3SlaveInterface &_ifc,
                   PortID _id = InvalidPortID);
-    virtual ~SMMUDevicePort() {}
+    virtual ~SMMUSlavePort() {}
 
     virtual AddrRangeList getAddrRanges() const
     { return AddrRangeList { AddrRange(0, UINT64_MAX) }; }
@@ -106,24 +106,24 @@ class SMMUControlPort : public SimpleTimingPort
     virtual ~SMMUControlPort() {}
 };
 
-class SMMUATSMemoryPort : public QueuedRequestPort
+class SMMUATSMasterPort : public QueuedMasterPort
 {
   protected:
-    SMMUv3DeviceInterface &ifc;
+    SMMUv3SlaveInterface &ifc;
     ReqPacketQueue reqQueue;
     SnoopRespPacketQueue snoopRespQueue;
 
     virtual bool recvTimingResp(PacketPtr pkt);
 
   public:
-    SMMUATSMemoryPort(const std::string &_name, SMMUv3DeviceInterface &_ifc);
-    virtual ~SMMUATSMemoryPort() {}
+    SMMUATSMasterPort(const std::string &_name, SMMUv3SlaveInterface &_ifc);
+    virtual ~SMMUATSMasterPort() {}
 };
 
-class SMMUATSDevicePort : public QueuedResponsePort
+class SMMUATSSlavePort : public QueuedSlavePort
 {
   protected:
-    SMMUv3DeviceInterface &ifc;
+    SMMUv3SlaveInterface &ifc;
     RespPacketQueue respQueue;
 
     virtual void recvFunctional(PacketPtr pkt);
@@ -134,8 +134,8 @@ class SMMUATSDevicePort : public QueuedResponsePort
     { return AddrRangeList(); }
 
   public:
-    SMMUATSDevicePort(const std::string &_name, SMMUv3DeviceInterface &_ifc);
-    virtual ~SMMUATSDevicePort() {}
+    SMMUATSSlavePort(const std::string &_name, SMMUv3SlaveInterface &_ifc);
+    virtual ~SMMUATSSlavePort() {}
 };
 
 #endif /* __DEV_ARM_SMMU_V3_PORTS_HH__ */

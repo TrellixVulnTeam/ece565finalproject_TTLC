@@ -34,6 +34,5 @@
 extern Stats::Formula simSeconds;
 extern Stats::Value simTicks;
 extern Stats::Value simFreq;
-extern Stats::Value hostSeconds;
 
 #endif // __SIM_SIM_STATS_HH__

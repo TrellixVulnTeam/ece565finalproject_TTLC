@@ -40,14 +40,10 @@ let {{
     svcCode = '''
     ThreadContext *tc = xc->tcBase();
 
-    bool have_semi = ArmSystem::haveSemihosting(tc);
-    if (have_semi && Thumb && imm == ArmSemihosting::T32Imm) {
-        // Enable gem5 extensions since we can't distinguish in thumb.
-        ArmSystem::callSemihosting32(tc, true);
-    } else if (have_semi && imm == ArmSemihosting::A32Imm) {
+    const auto semihost_imm = Thumb? 0xAB : 0x123456;
+
+    if (ArmSystem::haveSemihosting(tc) && imm == semihost_imm) {
         ArmSystem::callSemihosting32(tc);
-    } else if (have_semi && imm == ArmSemihosting::Gem5Imm) {
-        ArmSystem::callSemihosting32(tc, true);
     } else {
         fault = std::make_shared<SupervisorCall>(machInst, imm);
     }
@@ -95,7 +91,8 @@ let {{
     SCR  scr  = Scr;
 
     if ((cpsr.mode != MODE_USER) && FullSystem) {
-        if (EL2Enabled(xc->tcBase()) && (cpsr.mode != MODE_HYP) && hcr.tsc) {
+        if (ArmSystem::haveVirtualization(xc->tcBase()) &&
+            !inSecureState(scr, cpsr) && (cpsr.mode != MODE_HYP) && hcr.tsc) {
             fault = std::make_shared<HypervisorTrap>(machInst, 0,
                                                      EC_SMC_TO_HYP);
         } else {
@@ -119,15 +116,13 @@ let {{
     exec_output += PredOpExecute.subst(smcIop)
 
     hvcCode = '''
-    HCR  hcr  = Hcr;
     CPSR cpsr = Cpsr;
     SCR  scr  = Scr;
 
     // Filter out the various cases where this instruction isn't defined
     if (!FullSystem || !ArmSystem::haveVirtualization(xc->tcBase()) ||
         (cpsr.mode == MODE_USER) ||
-        (isSecure(xc->tcBase()) && !IsSecureEL2Enabled(xc->tcBase())) ||
-        (ArmSystem::haveSecurity(xc->tcBase()) ? !scr.hce : hcr.hcd)) {
+        (ArmSystem::haveSecurity(xc->tcBase()) && (!scr.ns || !scr.hce))) {
         fault = disabledFault();
     } else {
         fault = std::make_shared<HypervisorCall>(machInst, imm);
@@ -143,12 +138,6 @@ let {{
     exec_output += PredOpExecute.subst(hvcIop)
 
     eretCode = '''
-        if (xc->inHtmTransactionalState()) {
-            fault = std::make_shared<GenericHtmFailureFault>(
-                xc->getHtmTransactionUid(),
-                HtmFailureFaultCause::EXCEPTION);
-            return fault;
-        }
         SCTLR sctlr   = Sctlr;
         CPSR old_cpsr = Cpsr;
         old_cpsr.nz   = CondCodesNZ;
@@ -728,19 +717,18 @@ let {{
 
     // WFE Sleeps if SevMailbox==0 and no unmasked interrupts are pending,
     ThreadContext *tc = xc->tcBase();
-    Tick next_cycle = tc->getCpuPtr()->nextCycle();
     if (SevMailbox == 1) {
         SevMailbox = 0;
-        tc->quiesceTick(next_cycle + 1);
+        PseudoInst::quiesceSkip(tc);
     } else if (tc->getCpuPtr()->getInterruptController(
-                tc->threadId())->checkInterrupts()) {
-        tc->quiesceTick(next_cycle + 1);
+                tc->threadId())->checkInterrupts(tc)) {
+        PseudoInst::quiesceSkip(tc);
     } else {
         fault = trapWFx(tc, cpsr, scr, true);
         if (fault == NoFault) {
-            tc->quiesce();
+            PseudoInst::quiesce(tc);
         } else {
-            tc->quiesceTick(next_cycle + 1);
+            PseudoInst::quiesceSkip(tc);
         }
     }
     '''
@@ -760,12 +748,6 @@ let {{
     exec_output += QuiescePredOpExecuteWithFixup.subst(wfeIop)
 
     wfiCode = '''
-    if (xc->inHtmTransactionalState()) {
-        fault = std::make_shared<GenericHtmFailureFault>(
-            xc->getHtmTransactionUid(),
-            HtmFailureFaultCause::EXCEPTION);
-        return fault;
-    }
     HCR  hcr  = Hcr;
     CPSR cpsr = Cpsr;
     SCR  scr  = Scr64;
@@ -774,16 +756,15 @@ let {{
     ThreadContext *tc = xc->tcBase();
     auto *ic = dynamic_cast<ArmISA::Interrupts *>(
             tc->getCpuPtr()->getInterruptController(tc->threadId()));
-    Tick next_cycle = tc->getCpuPtr()->nextCycle();
     if (ic->checkWfiWake(hcr, cpsr, scr)) {
-        tc->quiesceTick(next_cycle + 1);
+        PseudoInst::quiesceSkip(tc);
     } else {
         fault = trapWFx(tc, cpsr, scr, false);
         if (fault == NoFault) {
-            tc->quiesce();
+            PseudoInst::quiesce(tc);
             ArmSystem::callSetStandByWfi(tc);
         } else {
-            tc->quiesceTick(next_cycle + 1);
+            PseudoInst::quiesceSkip(tc);
         }
     }
     tc->getCpuPtr()->clearInterrupt(tc->threadId(), INT_ABT, 0);
@@ -799,8 +780,8 @@ let {{
     sevCode = '''
     SevMailbox = 1;
     System *sys = xc->tcBase()->getSystemPtr();
-    for (int x = 0; x < sys->threads.size(); x++) {
-        ThreadContext *oc = sys->threads[x];
+    for (int x = 0; x < sys->numContexts(); x++) {
+        ThreadContext *oc = sys->getThreadContext(x);
         if (oc == xc->tcBase())
             continue;
 
@@ -949,7 +930,7 @@ let {{
     // the register is accessable, in other modes we trap if only if the register
     // IS accessable.
     if (undefined || (!can_read && !(fault != NoFault && !inUserMode(Cpsr) &&
-                                    !isSecure(xc->tcBase())))) {
+                                    !inSecureState(Scr, Cpsr)))) {
         return std::make_shared<UndefinedInstruction>(machInst, false,
                                                       mnemonic);
     }
@@ -983,7 +964,7 @@ let {{
     // the register is accessable, in other modes we trap if only if the register
     // IS accessable.
     if (undefined || (!can_write && !(fault != NoFault && !inUserMode(Cpsr) &&
-                                      !isSecure(xc->tcBase())))) {
+                                      !inSecureState(Scr, Cpsr)))) {
         return std::make_shared<UndefinedInstruction>(machInst, false,
                                                       mnemonic);
     }
@@ -1016,7 +997,7 @@ let {{
     // the register is accessable, in other modes we trap if only if the register
     // IS accessable.
     if (undefined || (!can_read && !(fault != NoFault && !inUserMode(Cpsr) &&
-                                     !isSecure(xc->tcBase())))) {
+                                     !inSecureState(Scr, Cpsr)))) {
         return std::make_shared<UndefinedInstruction>(machInst, false,
                                                       mnemonic);
     }
@@ -1050,7 +1031,7 @@ let {{
     // the register is accessable, in other modes we trap if only if the register
     // IS accessable.
     if (undefined || (!can_write && !(fault != NoFault && !inUserMode(Cpsr) &&
-                                     !isSecure(xc->tcBase())))) {
+                                     !inSecureState(Scr, Cpsr)))) {
         return std::make_shared<UndefinedInstruction>(machInst, false,
                                                       mnemonic);
     }
@@ -1128,7 +1109,7 @@ let {{
         // of whether the register is accessible, in other modes we
         // trap if only if the register IS accessible.
         if (undefined || (!can_write & !(hypTrap & !inUserMode(Cpsr) &
-                                         !isSecure(xc->tcBase())))) {
+                                         !inSecureState(Scr, Cpsr)))) {
             return std::make_shared<UndefinedInstruction>(machInst, false,
                                                           mnemonic);
         }
@@ -1149,7 +1130,7 @@ let {{
                                    "postacc_code": "",
                                    "ea_code": McrDcimvacCode,
                                    "predicate_test": predicateTest},
-                                ['IsStore'])
+                                ['IsMemRef', 'IsStore'])
     header_output += MiscRegRegImmMemOpDeclare.subst(McrDcimvacIop)
     decoder_output += MiscRegRegImmOpConstructor.subst(McrDcimvacIop)
     exec_output += Mcr15Execute.subst(McrDcimvacIop) + \
@@ -1167,7 +1148,7 @@ let {{
                                    "postacc_code": "",
                                    "ea_code": McrDccmvacCode,
                                    "predicate_test": predicateTest},
-                                ['IsStore'])
+                                ['IsMemRef', 'IsStore'])
     header_output += MiscRegRegImmMemOpDeclare.subst(McrDccmvacIop)
     decoder_output += MiscRegRegImmOpConstructor.subst(McrDccmvacIop)
     exec_output += Mcr15Execute.subst(McrDccmvacIop) + \
@@ -1185,7 +1166,7 @@ let {{
                                    "postacc_code": "",
                                    "ea_code": McrDccmvauCode,
                                    "predicate_test": predicateTest},
-                                ['IsStore'])
+                                ['IsMemRef', 'IsStore'])
     header_output += MiscRegRegImmMemOpDeclare.subst(McrDccmvauIop)
     decoder_output += MiscRegRegImmOpConstructor.subst(McrDccmvauIop)
     exec_output += Mcr15Execute.subst(McrDccmvauIop) + \
@@ -1204,7 +1185,7 @@ let {{
                                    "postacc_code": "",
                                    "ea_code": McrDccimvacCode,
                                    "predicate_test": predicateTest},
-                                ['IsStore'])
+                                ['IsMemRef', 'IsStore'])
     header_output += MiscRegRegImmMemOpDeclare.subst(McrDccimvacIop)
     decoder_output += MiscRegRegImmOpConstructor.subst(McrDccimvacIop)
     exec_output += Mcr15Execute.subst(McrDccimvacIop) + \
@@ -1238,8 +1219,7 @@ let {{
     dsbIop = InstObjParams("dsb", "Dsb", "ImmOp",
                              {"code": dsbCode,
                                "predicate_test": predicateTest},
-                              ['IsReadBarrier', 'IsWriteBarrier',
-                               'IsSerializeAfter'])
+                              ['IsMemBarrier', 'IsSerializeAfter'])
     header_output += ImmOpDeclare.subst(dsbIop)
     decoder_output += ImmOpConstructor.subst(dsbIop)
     exec_output += PredOpExecute.subst(dsbIop)
@@ -1255,7 +1235,7 @@ let {{
     dmbIop = InstObjParams("dmb", "Dmb", "ImmOp",
                              {"code": dmbCode,
                                "predicate_test": predicateTest},
-                               ['IsReadBarrier', 'IsWriteBarrier'])
+                               ['IsMemBarrier'])
     header_output += ImmOpDeclare.subst(dmbIop)
     decoder_output += ImmOpConstructor.subst(dmbIop)
     exec_output += PredOpExecute.subst(dmbIop)

@@ -121,7 +121,6 @@ class BitfieldType : public BitfieldTypeImpl<Base>
     BitfieldType(const BitfieldType &) = default;
 
     operator Type () const { return Impl::operator Type(); }
-
     Type operator=(const Type val) { return Impl::operator=(val); }
     Type
     operator=(BitfieldType<Base> const & other)
@@ -322,14 +321,10 @@ namespace BitfieldBackend
         union { \
             type __storage;
 
-/**
- * This closes off the class and union started by the above macro. It is
- * followed by a typedef which makes "name" refer to a BitfieldOperator
- * class inheriting from the class and union just defined, which completes
- * building up the type for the user.
- *
- * @ingroup api_bitunion
- */
+//This closes off the class and union started by the above macro. It is
+//followed by a typedef which makes "name" refer to a BitfieldOperator
+//class inheriting from the class and union just defined, which completes
+//building up the type for the user.
 #define EndBitUnion(name) \
         }; \
     }; \
@@ -348,15 +343,11 @@ namespace BitfieldBackend
         union { \
             fieldType<__VA_ARGS__> __storage;
 
-/**
- * This closes off the union created above and gives it a name. Unlike the top
- * level BitUnion, we're interested in creating an object instead of a type.
- * The operators are defined in the macro itself instead of a class for
- * technical reasons. If someone determines a way to move them to one, please
- * do so.
- *
- * @ingroup api_bitunion
- */
+//This closes off the union created above and gives it a name. Unlike the top
+//level BitUnion, we're interested in creating an object instead of a type.
+//The operators are defined in the macro itself instead of a class for
+//technical reasons. If someone determines a way to move them to one, please
+//do so.
 #define EndSubBitUnion(name) \
         }; \
         inline operator __StorageType () const \
@@ -366,36 +357,20 @@ namespace BitfieldBackend
         { return __storage = _storage;} \
     } name;
 
-/**
- * Regular bitfields
- * These define macros for read/write regular bitfield based subbitfields.
- *
- * @ingroup api_bitunion
- */
+//Regular bitfields
+//These define macros for read/write regular bitfield based subbitfields.
 #define SubBitUnion(name, first, last) \
     __SubBitUnion(name, Bitfield, first, last)
 
-/**
- * Regular bitfields
- * These define macros for read/write regular bitfield based subbitfields.
- *
- * @ingroup api_bitunion
- */
+//Regular bitfields
+//These define macros for read/write regular bitfield based subbitfields.
 #define SignedSubBitUnion(name, first, last) \
     __SubBitUnion(name, SignedBitfield, first, last)
 
-/**
- * Use this to define an arbitrary type overlayed with bitfields.
- *
- * @ingroup api_bitunion
- */
+//Use this to define an arbitrary type overlayed with bitfields.
 #define BitUnion(type, name) __BitUnion(type, name)
 
-/**
- * Use this to define conveniently sized values overlayed with bitfields.
- *
- * @ingroup api_bitunion
- */
+//Use this to define conveniently sized values overlayed with bitfields.
 #define BitUnion64(name) __BitUnion(uint64_t, name)
 #define BitUnion32(name) __BitUnion(uint32_t, name)
 #define BitUnion16(name) __BitUnion(uint16_t, name)
@@ -417,9 +392,6 @@ namespace BitfieldBackend
 
 //Also, BitUnionBaseType can be used on a BitUnion type directly.
 
-/**
- * @ingroup api_bitunion
- */
 template <typename T>
 using BitUnionType = BitfieldBackend::BitUnionOperators<T>;
 
@@ -438,9 +410,6 @@ namespace BitfieldBackend
     };
 }
 
-/**
- * @ingroup api_bitunion
- */
 template <typename T>
 using BitUnionBaseType = typename BitfieldBackend::BitUnionBaseType<T>::Type;
 
@@ -491,12 +460,8 @@ namespace BitfieldBackend
     }
 }
 
-/**
- * A default << operator which casts a bitunion to its underlying type and
- * passes it to BitfieldBackend::bitfieldBackendPrinter.
- *
- * @ingroup api_bitunion
- */
+//A default << operator which casts a bitunion to its underlying type and
+//passes it to BitfieldBackend::bitfieldBackendPrinter.
 template <typename T>
 std::ostream &
 operator << (std::ostream &os, const BitUnionType<T> &bu)

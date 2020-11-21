@@ -37,7 +37,7 @@
 
 #include "dev/arm/smmu_v3_events.hh"
 
-#include "dev/arm/smmu_v3_deviceifc.hh"
+#include "dev/arm/smmu_v3_slaveifc.hh"
 
 void
 SMMUDeviceRetryEvent::process()

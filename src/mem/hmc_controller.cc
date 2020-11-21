@@ -1,15 +1,14 @@
 #include "mem/hmc_controller.hh"
 
 #include "base/random.hh"
-#include "base/trace.hh"
 #include "debug/HMCController.hh"
 
 HMCController::HMCController(const HMCControllerParams* p) :
     NoncoherentXBar(p),
-    numMemSidePorts(p->port_mem_side_ports_connection_count),
+    n_master_ports(p->port_master_connection_count),
     rr_counter(0)
 {
-    assert(p->port_cpu_side_ports_connection_count == 1);
+    assert(p->port_slave_connection_count == 1);
 }
 
 HMCController*
@@ -18,43 +17,43 @@ HMCControllerParams::create()
     return new HMCController(this);
 }
 
-// Since this module is a load distributor, all its request ports have the same
+// Since this module is a load distributor, all its master ports have the same
 //  range so we should keep only one of the ranges and ignore the others
-void HMCController::recvRangeChange(PortID mem_side_port_id)
+void HMCController::recvRangeChange(PortID master_port_id)
 {
-    if (mem_side_port_id == 0)
+    if (master_port_id == 0)
     {
        gotAllAddrRanges = true;
-       BaseXBar::recvRangeChange(mem_side_port_id);
+       BaseXBar::recvRangeChange(master_port_id);
     }
     else
-        gotAddrRanges[mem_side_port_id] = true;
+        gotAddrRanges[master_port_id] = true;
 }
 
 int HMCController::rotate_counter()
 {
     int current_value = rr_counter;
     rr_counter++;
-    if (rr_counter == numMemSidePorts)
+    if (rr_counter == n_master_ports)
         rr_counter = 0;
     return current_value;
 }
 
-bool HMCController::recvTimingReq(PacketPtr pkt, PortID cpu_side_port_id)
+bool HMCController::recvTimingReq(PacketPtr pkt, PortID slave_port_id)
 {
     // determine the source port based on the id
-    ResponsePort *src_port = cpuSidePorts[cpu_side_port_id];
+    SlavePort *src_port = slavePorts[slave_port_id];
 
     // we should never see express snoops on a non-coherent component
     assert(!pkt->isExpressSnoop());
 
     // For now, this is a simple round robin counter, for distribution the
     //  load among the serial links
-    PortID mem_side_port_id = rotate_counter();
+    PortID master_port_id = rotate_counter();
 
     // test if the layer should be considered occupied for the current
     // port
-    if (!reqLayers[mem_side_port_id]->tryTiming(src_port)) {
+    if (!reqLayers[master_port_id]->tryTiming(src_port)) {
         DPRINTF(HMCController, "recvTimingReq: src %s %s 0x%x BUSY\n",
                 src_port->name(), pkt->cmdString(), pkt->getAddr());
         return false;
@@ -86,7 +85,7 @@ bool HMCController::recvTimingReq(PacketPtr pkt, PortID cpu_side_port_id)
         !pkt->cacheResponding();
 
     // since it is a normal request, attempt to send the packet
-    bool success = memSidePorts[mem_side_port_id]->sendTimingReq(pkt);
+    bool success = masterPorts[master_port_id]->sendTimingReq(pkt);
 
     if (!success)  {
         DPRINTF(HMCController, "recvTimingReq: src %s %s 0x%x RETRY\n",
@@ -96,7 +95,7 @@ bool HMCController::recvTimingReq(PacketPtr pkt, PortID cpu_side_port_id)
         pkt->headerDelay = old_header_delay;
 
         // occupy until the header is sent
-        reqLayers[mem_side_port_id]->failedTiming(src_port,
+        reqLayers[master_port_id]->failedTiming(src_port,
                                                 clockEdge(Cycles(1)));
 
         return false;
@@ -105,14 +104,14 @@ bool HMCController::recvTimingReq(PacketPtr pkt, PortID cpu_side_port_id)
     // remember where to route the response to
     if (expect_response) {
         assert(routeTo.find(pkt->req) == routeTo.end());
-        routeTo[pkt->req] = cpu_side_port_id;
+        routeTo[pkt->req] = slave_port_id;
     }
 
-    reqLayers[mem_side_port_id]->succeededTiming(packetFinishTime);
+    reqLayers[master_port_id]->succeededTiming(packetFinishTime);
 
     // stats updates
-    pktCount[cpu_side_port_id][mem_side_port_id]++;
-    pktSize[cpu_side_port_id][mem_side_port_id] += pkt_size;
+    pktCount[slave_port_id][master_port_id]++;
+    pktSize[slave_port_id][master_port_id] += pkt_size;
     transDist[pkt_cmd]++;
 
     return true;

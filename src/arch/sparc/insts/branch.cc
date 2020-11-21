@@ -77,17 +77,18 @@ BranchDisp::generateDisassembly(
         Addr pc, const Loader::SymbolTable *symtab) const
 {
     std::stringstream response;
+    std::string symbol;
+    Addr symbol_addr;
 
     Addr target = disp + pc;
 
     printMnemonic(response, mnemonic);
-    ccprintf(response, "%#x", target);
+    ccprintf(response, "0x%x", target);
 
-    Loader::SymbolTable::const_iterator it;
-    if (symtab && (it = symtab->findNearest(target)) != symtab->end()) {
-        ccprintf(response, " <%s", it->name);
-        if (it->address != target)
-            ccprintf(response, "+%d>", target - it->address);
+    if (symtab && symtab->findNearestSymbol(target, symbol, symbol_addr)) {
+        ccprintf(response, " <%s", symbol);
+        if (symbol_addr != target)
+            ccprintf(response, "+%d>", target - symbol_addr);
         else
             ccprintf(response, ">");
     }

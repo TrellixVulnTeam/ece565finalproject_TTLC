@@ -105,27 +105,21 @@ class ExecContext : public ::ExecContext
     Fault
     initiateMemRead(Addr addr, unsigned int size,
                     Request::Flags flags,
-                    const std::vector<bool>& byte_enable) override
+                    const std::vector<bool>& byte_enable =
+                        std::vector<bool>()) override
     {
-        assert(byte_enable.size() == size);
+        assert(byte_enable.empty() || byte_enable.size() == size);
         return execute.getLSQ().pushRequest(inst, true /* load */, nullptr,
             size, addr, flags, nullptr, nullptr, byte_enable);
     }
 
     Fault
-    initiateHtmCmd(Request::Flags flags) override
-    {
-        panic("ExecContext::initiateHtmCmd() not implemented on MinorCPU\n");
-        return NoFault;
-    }
-
-    Fault
     writeMem(uint8_t *data, unsigned int size, Addr addr,
              Request::Flags flags, uint64_t *res,
-             const std::vector<bool>& byte_enable)
+             const std::vector<bool>& byte_enable = std::vector<bool>())
         override
     {
-        assert(byte_enable.size() == size);
+        assert(byte_enable.empty() || byte_enable.size() == size);
         return execute.getLSQ().pushRequest(inst, false /* store */, data,
             size, addr, flags, res, nullptr, byte_enable);
     }
@@ -136,8 +130,7 @@ class ExecContext : public ::ExecContext
     {
         // AMO requests are pushed through the store path
         return execute.getLSQ().pushRequest(inst, false /* amo */, nullptr,
-            size, addr, flags, nullptr, std::move(amo_op),
-            std::vector<bool>(size, true));
+            size, addr, flags, nullptr, std::move(amo_op));
     }
 
     RegVal
@@ -340,39 +333,6 @@ class ExecContext : public ::ExecContext
         thread.setMemAccPredicate(val);
     }
 
-    // hardware transactional memory
-    uint64_t
-    getHtmTransactionUid() const override
-    {
-        panic("ExecContext::getHtmTransactionUid() not"
-              "implemented on MinorCPU\n");
-        return 0;
-    }
-
-    uint64_t
-    newHtmTransactionUid() const override
-    {
-        panic("ExecContext::newHtmTransactionUid() not"
-              "implemented on MinorCPU\n");
-        return 0;
-    }
-
-    bool
-    inHtmTransactionalState() const override
-    {
-        // ExecContext::inHtmTransactionalState() not
-        // implemented on MinorCPU
-        return false;
-    }
-
-    uint64_t
-    getHtmTransactionalDepth() const override
-    {
-        panic("ExecContext::getHtmTransactionalDepth() not"
-              "implemented on MinorCPU\n");
-        return 0;
-    }
-
     TheISA::PCState
     pcState() const override
     {
@@ -417,6 +377,12 @@ class ExecContext : public ::ExecContext
         const RegId& reg = si->destRegIdx(idx);
         assert(reg.isMiscReg());
         return thread.setMiscReg(reg.index(), val);
+    }
+
+    void
+    syscall(Fault *fault) override
+    {
+        thread.syscall(fault);
     }
 
     ThreadContext *tcBase() const override { return thread.getTC(); }

@@ -38,9 +38,9 @@
 #ifndef __DEV_VIRTIO_BASE_HH__
 #define __DEV_VIRTIO_BASE_HH__
 
-#include <functional>
-
+#include "arch/isa_traits.hh"
 #include "base/bitunion.hh"
+#include "base/callback.hh"
 #include "dev/virtio/virtio_ring.h"
 #include "mem/port_proxy.hh"
 #include "sim/sim_object.hh"
@@ -451,10 +451,10 @@ public:
         typedef uint16_t Flags;
         typedef uint16_t Index;
 
-        struct M5_ATTR_PACKED Header {
+        struct Header {
             Flags flags;
             Index index;
-        };
+        } M5_ATTR_PACKED;
 
         VirtRing<T>(PortProxy &proxy, ByteOrder bo, uint16_t size) :
             header{0, 0}, ring(size), _proxy(proxy), _base(0), byteOrder(bo)
@@ -605,11 +605,9 @@ class VirtIODeviceBase : public SimObject
      * typically through an interrupt. Device models call this method
      * to tell the transport interface to notify the guest.
      */
-    void
-    kick()
-    {
+    void kick() {
         assert(transKick);
-        transKick();
+        transKick->process();
     };
 
     /**
@@ -727,13 +725,11 @@ class VirtIODeviceBase : public SimObject
       * Register a callback to kick the guest through the transport
       * interface.
       *
-      * @param callback Callback into transport interface.
+      * @param c Callback into transport interface.
       */
-    void
-    registerKickCallback(const std::function<void()> &callback)
-    {
+    void registerKickCallback(Callback *c) {
         assert(!transKick);
-        transKick = callback;
+        transKick = c;
     }
 
 
@@ -871,7 +867,7 @@ class VirtIODeviceBase : public SimObject
     std::vector<VirtQueue *> _queues;
 
     /** Callbacks to kick the guest through the transport layer  */
-    std::function<void()> transKick;
+    Callback *transKick;
 };
 
 class VirtIODummyDevice : public VirtIODeviceBase

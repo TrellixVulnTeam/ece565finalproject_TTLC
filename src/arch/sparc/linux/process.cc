@@ -81,21 +81,21 @@ Sparc32LinuxProcess::Sparc32LinuxProcess(ProcessParams * params,
 {}
 
 void
-Sparc32LinuxProcess::syscall(ThreadContext *tc)
+Sparc32LinuxProcess::syscall(ThreadContext *tc, Fault *fault)
 {
-    Sparc32Process::syscall(tc);
-    syscall32Descs.get(tc->readIntReg(1))->doSyscall(tc);
+    Sparc32Process::syscall(tc, fault);
+    syscall32Descs.get(tc->readIntReg(1))->doSyscall(tc, fault);
 }
 
 void
-Sparc32LinuxProcess::handleTrap(int trapNum, ThreadContext *tc)
+Sparc32LinuxProcess::handleTrap(int trapNum, ThreadContext *tc, Fault *fault)
 {
     switch (trapNum) {
       case 0x10: //Linux 32 bit syscall trap
-        tc->getSystemPtr()->workload->syscall(tc);
+        tc->syscall(fault);
         break;
       default:
-        SparcProcess::handleTrap(trapNum, tc);
+        SparcProcess::handleTrap(trapNum, tc, fault);
     }
 }
 
@@ -105,10 +105,10 @@ Sparc64LinuxProcess::Sparc64LinuxProcess(ProcessParams * params,
 {}
 
 void
-Sparc64LinuxProcess::syscall(ThreadContext *tc)
+Sparc64LinuxProcess::syscall(ThreadContext *tc, Fault *fault)
 {
-    Sparc64Process::syscall(tc);
-    syscallDescs.get(tc->readIntReg(1))->doSyscall(tc);
+    Sparc64Process::syscall(tc, fault);
+    syscallDescs.get(tc->readIntReg(1))->doSyscall(tc, fault);
 }
 
 void
@@ -124,12 +124,12 @@ Sparc64LinuxProcess::setContext(ThreadContext *tc)
 }
 
 void
-Sparc64LinuxProcess::handleTrap(int trapNum, ThreadContext *tc)
+Sparc64LinuxProcess::handleTrap(int trapNum, ThreadContext *tc, Fault *fault)
 {
     switch (trapNum) {
       // case 0x10: // Linux 32 bit syscall trap
       case 0x6d: // Linux 64 bit syscall trap
-        tc->getSystemPtr()->workload->syscall(tc);
+        tc->syscall(fault);
         break;
       case 0x6e: // Linux 64 bit getcontext trap
         getContext(tc);
@@ -138,6 +138,6 @@ Sparc64LinuxProcess::handleTrap(int trapNum, ThreadContext *tc)
         setContext(tc);
         break;
       default:
-        SparcProcess::handleTrap(trapNum, tc);
+        SparcProcess::handleTrap(trapNum, tc, fault);
     }
 }

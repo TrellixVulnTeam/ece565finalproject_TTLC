@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2012, 2014, 2016, 2017, 2019-2020 ARM Limited
+ * Copyright (c) 2011-2012, 2014, 2016, 2017, 2019 ARM Limited
  * Copyright (c) 2013 Advanced Micro Devices, Inc.
  * All rights reserved
  *
@@ -43,12 +43,14 @@
 #include "cpu/o3/cpu.hh"
 
 #include "arch/generic/traits.hh"
+#include "arch/kernel_stats.hh"
 #include "config/the_isa.hh"
 #include "cpu/activity.hh"
 #include "cpu/checker/cpu.hh"
 #include "cpu/checker/thread_context.hh"
 #include "cpu/o3/isa_specific.hh"
 #include "cpu/o3/thread_context.hh"
+#include "cpu/quiesce_event.hh"
 #include "cpu/simple_thread.hh"
 #include "cpu/thread_context.hh"
 #include "debug/Activity.hh"
@@ -339,6 +341,9 @@ FullO3CPU<Impl>::FullO3CPU(DerivO3CPUParams *params)
         assert(o3_tc->cpu);
         o3_tc->thread = this->thread[tid];
 
+        // Setup quiesce event.
+        this->thread[tid]->quiesceEvent = new EndQuiesceEvent(tc);
+
         // Give the thread the TC.
         this->thread[tid]->tc = tc;
 
@@ -441,7 +446,12 @@ FullO3CPU<Impl>::regStats()
         .precision(6);
     totalIpc =  sum(committedInsts) / numCycles;
 
+    this->fetch.regStats();
+    this->decode.regStats();
+    this->rename.regStats();
     this->iew.regStats();
+    this->commit.regStats();
+    this->rob.regStats();
 
     intRegfileReads
         .name(name() + ".int_regfile_reads")
@@ -589,6 +599,8 @@ void
 FullO3CPU<Impl>::startup()
 {
     BaseCPU::startup();
+    for (int tid = 0; tid < numThreads; ++tid)
+        isa[tid]->startup(threadContexts[tid]);
 
     fetch.startupStage();
     decode.startupStage();
@@ -619,10 +631,6 @@ template <class Impl>
 void
 FullO3CPU<Impl>::deactivateThread(ThreadID tid)
 {
-    // hardware transactional memory
-    // shouldn't deactivate thread in the middle of a transaction
-    assert(!commit.executingHtmTransaction(tid));
-
     //Remove From Active List, if Active
     list<ThreadID>::iterator thread_it =
         std::find(activeThreads.begin(), activeThreads.end(), tid);
@@ -749,7 +757,7 @@ FullO3CPU<Impl>::insertThread(ThreadID tid)
     // and not in the ThreadContext.
     ThreadContext *src_tc;
     if (FullSystem)
-        src_tc = system->threads[tid];
+        src_tc = system->threadContexts[tid];
     else
         src_tc = tcBase(tid);
 
@@ -883,7 +891,7 @@ Fault
 FullO3CPU<Impl>::getInterrupts()
 {
     // Check if there are any outstanding interrupts
-    return this->interrupts[0]->getInterrupt();
+    return this->interrupts[0]->getInterrupt(this->threadContexts[0]);
 }
 
 template <class Impl>
@@ -897,7 +905,7 @@ FullO3CPU<Impl>::processInterrupts(const Fault &interrupt)
     // @todo: Allow other threads to handle interrupts.
 
     assert(interrupt != NoFault);
-    this->interrupts[0]->updateIntrInfo();
+    this->interrupts[0]->updateIntrInfo(this->threadContexts[0]);
 
     DPRINTF(O3CPU, "Interrupt %s being handled\n", interrupt->name());
     this->trap(interrupt, 0, nullptr);
@@ -910,6 +918,26 @@ FullO3CPU<Impl>::trap(const Fault &fault, ThreadID tid,
 {
     // Pass the thread's TC into the invoke method.
     fault->invoke(this->threadContexts[tid], inst);
+}
+
+template <class Impl>
+void
+FullO3CPU<Impl>::syscall(ThreadID tid, Fault *fault)
+{
+    DPRINTF(O3CPU, "[tid:%i] Executing syscall().\n\n", tid);
+
+    DPRINTF(Activity,"Activity: syscall() called.\n");
+
+    // Temporarily increase this by one to account for the syscall
+    // instruction.
+    ++(this->thread[tid]->funcExeInst);
+
+    // Execute the actual syscall.
+    this->thread[tid]->syscall(fault);
+
+    // Decrease funcExeInst by one as the normal commit will handle
+    // incrementing it.
+    --(this->thread[tid]->funcExeInst);
 }
 
 template <class Impl>
@@ -1152,7 +1180,7 @@ RegVal
 FullO3CPU<Impl>::readMiscReg(int misc_reg, ThreadID tid)
 {
     miscRegfileReads++;
-    return this->isa[tid]->readMiscReg(misc_reg);
+    return this->isa[tid]->readMiscReg(misc_reg, tcBase(tid));
 }
 
 template <class Impl>
@@ -1167,7 +1195,7 @@ void
 FullO3CPU<Impl>::setMiscReg(int misc_reg, RegVal val, ThreadID tid)
 {
     miscRegfileWrites++;
-    this->isa[tid]->setMiscReg(misc_reg, val);
+    this->isa[tid]->setMiscReg(misc_reg, val, tcBase(tid));
 }
 
 template <class Impl>
@@ -1492,7 +1520,7 @@ FullO3CPU<Impl>::instDone(ThreadID tid, const DynInstPtr &inst)
     // Keep an instruction count.
     if (!inst->isMicroop() || inst->isLastMicroop()) {
         thread[tid]->numInst++;
-        thread[tid]->threadStats.numInsts++;
+        thread[tid]->numInsts++;
         committedInsts[tid]++;
         system->totalNumInsts++;
 
@@ -1500,7 +1528,7 @@ FullO3CPU<Impl>::instDone(ThreadID tid, const DynInstPtr &inst)
         thread[tid]->comInstEventQueue.serviceEvents(thread[tid]->numInst);
     }
     thread[tid]->numOp++;
-    thread[tid]->threadStats.numOps++;
+    thread[tid]->numOps++;
     committedOps[tid]++;
 
     probeInstCommit(inst->staticInst, inst->instAddr());
@@ -1804,42 +1832,6 @@ FullO3CPU<Impl>::exitThreads()
         } else {
             it++;
         }
-    }
-}
-
-template <class Impl>
-void
-FullO3CPU<Impl>::htmSendAbortSignal(ThreadID tid, uint64_t htm_uid,
-     HtmFailureFaultCause cause)
-{
-    const Addr addr = 0x0ul;
-    const int size = 8;
-    const Request::Flags flags =
-      Request::PHYSICAL|Request::STRICT_ORDER|Request::HTM_ABORT;
-
-    // O3-specific actions
-    this->iew.ldstQueue.resetHtmStartsStops(tid);
-    this->commit.resetHtmStartsStops(tid);
-
-    // notify l1 d-cache (ruby) that core has aborted transaction
-    RequestPtr req =
-        std::make_shared<Request>(addr, size, flags, _dataRequestorId);
-
-    req->taskId(taskId());
-    req->setContext(this->thread[tid]->contextId());
-    req->setHtmAbortCause(cause);
-
-    assert(req->isHTMAbort());
-
-    PacketPtr abort_pkt = Packet::createRead(req);
-    uint8_t *memData = new uint8_t[8];
-    assert(memData);
-    abort_pkt->dataStatic(memData);
-    abort_pkt->setHtmTransactional(htm_uid);
-
-    // TODO include correct error handling here
-    if (!this->iew.ldstQueue.getDataPort().sendTimingReq(abort_pkt)) {
-        panic("HTM abort signal was not sent to the memory subsystem.");
     }
 }
 

@@ -91,7 +91,7 @@ let {{
                 self.instFlags.append("IsMicroop")
 
             if self.flavor in ("release", "acquire_release", "acquire"):
-                self.instFlags.extend(["IsReadBarrier", "IsWriteBarrier"])
+                self.instFlags.append("IsMemBarrier")
             if self.flavor in ("release", "acquire_release"):
                 self.instFlags.append("IsWriteBarrier")
             if self.flavor in ("acquire_release", "acquire"):
@@ -124,11 +124,11 @@ let {{
 
 
             fa_code = '''
-               fault->annotate(ArmISA::ArmFault::SAS, %s);
-               fault->annotate(ArmISA::ArmFault::SSE, %s);
-               fault->annotate(ArmISA::ArmFault::SRT, dest);
-               fault->annotate(ArmISA::ArmFault::SF, %s);
-               fault->annotate(ArmISA::ArmFault::AR, %s);
+               fault->annotate(ArmFault::SAS, %s);
+               fault->annotate(ArmFault::SSE, %s);
+               fault->annotate(ArmFault::SRT, dest);
+               fault->annotate(ArmFault::SF, %s);
+               fault->annotate(ArmFault::AR, %s);
                ''' % (sas_code,
                      "true" if not self.unsign else "false",
                      "true" if self.size == 8 else "false",

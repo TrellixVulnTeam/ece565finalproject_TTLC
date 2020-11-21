@@ -79,6 +79,7 @@ Memory64::setExcAcRel(bool exclusive, bool acrel)
     else
         memAccessFlags |= ArmISA::TLB::AllowUnaligned;
     if (acrel) {
+        flags[IsMemBarrier] = true;
         flags[IsWriteBarrier] = true;
         flags[IsReadBarrier] = true;
     }

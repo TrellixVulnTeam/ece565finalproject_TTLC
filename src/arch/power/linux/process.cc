@@ -76,9 +76,10 @@ PowerLinuxObjectFileLoader loader;
 
 /// Target uname() handler.
 static SyscallReturn
-unameFunc(SyscallDesc *desc, ThreadContext *tc, VPtr<Linux::utsname> name)
+unameFunc(SyscallDesc *desc, ThreadContext *tc, Addr utsname)
 {
     auto process = tc->getProcessPtr();
+    TypedBufferArg<Linux::utsname> name(utsname);
 
     strcpy(name->sysname, "Linux");
     strcpy(name->nodename, "sim.gem5.org");
@@ -86,6 +87,7 @@ unameFunc(SyscallDesc *desc, ThreadContext *tc, VPtr<Linux::utsname> name)
     strcpy(name->version, "#1 Mon Aug 18 11:32:15 EDT 2003");
     strcpy(name->machine, "power");
 
+    name.copyOut(tc->getVirtProxy());
     return 0;
 }
 
@@ -451,8 +453,8 @@ PowerLinuxProcess::initState()
 }
 
 void
-PowerLinuxProcess::syscall(ThreadContext *tc)
+PowerLinuxProcess::syscall(ThreadContext *tc, Fault *fault)
 {
-    PowerProcess::syscall(tc);
-    syscallDescs.get(tc->readIntReg(0))->doSyscall(tc);
+    PowerProcess::syscall(tc, fault);
+    syscallDescs.get(tc->readIntReg(0))->doSyscall(tc, fault);
 }

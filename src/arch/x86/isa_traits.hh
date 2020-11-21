@@ -38,14 +38,23 @@
 #ifndef __ARCH_X86_ISATRAITS_HH__
 #define __ARCH_X86_ISATRAITS_HH__
 
+#include "arch/x86/types.hh"
+#include "arch/x86/x86_traits.hh"
+#include "base/compiler.hh"
 #include "base/types.hh"
 
 namespace X86ISA
 {
-    const ByteOrder GuestByteOrder = ByteOrder::little;
+    const ByteOrder GuestByteOrder = LittleEndianByteOrder;
 
     const Addr PageShift = 12;
     const Addr PageBytes = ULL(1) << PageShift;
+
+    // Memory accesses can be unaligned
+    const bool HasUnalignedMemAcc = true;
+
+    const bool CurThreadInfoImplemented = false;
+    const int CurThreadInfoReg = -1;
 }
 
 #endif // __ARCH_X86_ISATRAITS_HH__

@@ -387,7 +387,7 @@ class PredMicroop : public PredOp
     }
 
     void
-    advancePC(PCState &pcState) const override
+    advancePC(PCState &pcState) const
     {
         if (flags[IsLastMicroop])
             pcState.uEnd();

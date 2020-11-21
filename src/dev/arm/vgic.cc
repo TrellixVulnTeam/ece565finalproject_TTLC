@@ -37,7 +37,6 @@
 
 #include "dev/arm/vgic.hh"
 
-#include "arch/arm/interrupts.hh"
 #include "base/trace.hh"
 #include "debug/Checkpoint.hh"
 #include "debug/VGIC.hh"
@@ -57,7 +56,7 @@ VGic::VGic(const Params *p)
         maintIntPosted[x] = false;
         vIntPosted[x] = false;
     }
-    assert(sys->threads.numRunning() <= VGIC_CPU_MAX);
+    assert(sys->numRunningContexts() <= VGIC_CPU_MAX);
 }
 
 VGic::~VGic()
@@ -148,7 +147,7 @@ VGic::readCtrl(PacketPtr pkt)
 
     DPRINTF(VGIC, "VGIC HVCtrl read register %#x\n", daddr);
 
-    /* Munge the address: 0-0xfff is the usual space banked by requestor CPU.
+    /* Munge the address: 0-0xfff is the usual space banked by requester CPU.
      * Anything > that is 0x200-sized slices of 'per CPU' regs.
      */
     if (daddr & ~0x1ff) {
@@ -292,7 +291,7 @@ VGic::writeCtrl(PacketPtr pkt)
     DPRINTF(VGIC, "VGIC HVCtrl write register %#x <= %#x\n",
             daddr, pkt->getLE<uint32_t>());
 
-    /* Munge the address: 0-0xfff is the usual space banked by requestor CPU.
+    /* Munge the address: 0-0xfff is the usual space banked by requester CPU.
      * Anything > that is 0x200-sized slices of 'per CPU' regs.
      */
     if (daddr & ~0x1ff) {
@@ -415,8 +414,8 @@ VGic::updateIntState(ContextID ctx_id)
         }
     }
 
-    assert(sys->threads.numRunning() <= VGIC_CPU_MAX);
-    for (int i = 0; i < sys->threads.numRunning(); i++) {
+    assert(sys->numRunningContexts() <= VGIC_CPU_MAX);
+    for (int i = 0; i < sys->numRunningContexts(); i++) {
         struct vcpuIntData *vid = &vcpuData[i];
         // Are any LRs active that weren't before?
         if (!vIntPosted[i]) {

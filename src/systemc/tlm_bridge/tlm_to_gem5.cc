@@ -67,7 +67,7 @@ namespace sc_gem5
 {
 
 PacketPtr
-payload2packet(RequestorID _id, tlm::tlm_generic_payload &trans)
+payload2packet(MasterID masterId, tlm::tlm_generic_payload &trans)
 {
     MemCmd cmd;
 
@@ -87,7 +87,7 @@ payload2packet(RequestorID _id, tlm::tlm_generic_payload &trans)
 
     Request::Flags flags;
     auto req = std::make_shared<Request>(
-        trans.get_address(), trans.get_data_length(), flags, _id);
+        trans.get_address(), trans.get_data_length(), flags, masterId);
 
     /*
      * Allocate a new Packet. The packet will be deleted when it returns from
@@ -156,21 +156,14 @@ TlmToGem5Bridge<BITWIDTH>::handleBeginReq(tlm::tlm_generic_payload &trans)
         extension->setPipeThrough();
         pkt = extension->getPacket();
     } else {
-        pkt = payload2packet(_id, trans);
+        pkt = payload2packet(masterId, trans);
     }
 
     auto tlmSenderState = new TlmSenderState(trans);
     pkt->pushSenderState(tlmSenderState);
 
-    // If the packet doesn't need a response, we should send BEGIN_RESP by
-    // ourselves.
-    bool needsResponse = pkt->needsResponse();
     if (bmp.sendTimingReq(pkt)) { // port is free -> send END_REQ immediately
         sendEndReq(trans);
-        if (!needsResponse) {
-            auto delay = sc_core::SC_ZERO_TIME;
-            sendBeginResp(trans, delay);
-        }
         trans.release();
     } else { // port is blocked -> wait for retry before sending END_REQ
         waitForRetry = true;
@@ -281,7 +274,7 @@ TlmToGem5Bridge<BITWIDTH>::b_transport(tlm::tlm_generic_payload &trans,
         extension->setPipeThrough();
         pkt = extension->getPacket();
     } else {
-        pkt = payload2packet(_id, trans);
+        pkt = payload2packet(masterId, trans);
     }
 
     MemBackdoorPtr backdoor = nullptr;
@@ -318,7 +311,7 @@ TlmToGem5Bridge<BITWIDTH>::transport_dbg(tlm::tlm_generic_payload &trans)
         extension->setPipeThrough();
         bmp.sendFunctional(extension->getPacket());
     } else {
-        auto pkt = payload2packet(_id, trans);
+        auto pkt = payload2packet(masterId, trans);
         if (pkt) {
             bmp.sendFunctional(pkt);
             destroyPacket(pkt);
@@ -344,7 +337,7 @@ TlmToGem5Bridge<BITWIDTH>::get_direct_mem_ptr(tlm::tlm_generic_payload &trans,
         extension->setPipeThrough();
         pkt = extension->getPacket();
     } else {
-        pkt = payload2packet(_id, trans);
+        pkt = payload2packet(masterId, trans);
         pkt->req->setFlags(Request::NO_ACCESS);
     }
 
@@ -436,19 +429,12 @@ TlmToGem5Bridge<BITWIDTH>::recvReqRetry()
     sc_assert(pendingRequest != nullptr);
     sc_assert(pendingPacket != nullptr);
 
-    // If the packet doesn't need a response, we should send BEGIN_RESP by
-    // ourselves.
-    bool needsResponse = pendingPacket->needsResponse();
     if (bmp.sendTimingReq(pendingPacket)) {
         waitForRetry = false;
         pendingPacket = nullptr;
 
         auto &trans = *pendingRequest;
         sendEndReq(trans);
-        if (!needsResponse) {
-            auto delay = sc_core::SC_ZERO_TIME;
-            sendBeginResp(trans, delay);
-        }
         trans.release();
 
         pendingRequest = nullptr;
@@ -484,7 +470,7 @@ TlmToGem5Bridge<BITWIDTH>::TlmToGem5Bridge(
     bmp(std::string(name()) + "master", *this), socket("tlm_socket"),
     wrapper(socket, std::string(name()) + ".tlm", InvalidPortID),
     system(params->system),
-    _id(params->system->getGlobalRequestorId(
+    masterId(params->system->getGlobalMasterId(
                 std::string("[systemc].") + name()))
 {
 }

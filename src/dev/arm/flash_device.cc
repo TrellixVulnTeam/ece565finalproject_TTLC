@@ -160,8 +160,8 @@ FlashDevice::~FlashDevice()
  * an event that uses the callback function on completion of the action.
  */
 void
-FlashDevice::accessDevice(uint64_t address, uint32_t amount,
-                          const std::function<void()> &event, Actions action)
+FlashDevice::accessDevice(uint64_t address, uint32_t amount, Callback *event,
+                          Actions action)
 {
     DPRINTF(FlashDevice, "Flash calculation for %d bytes in %d pages\n"
             , amount, pageSize);
@@ -258,6 +258,7 @@ FlashDevice::accessDevice(uint64_t address, uint32_t amount,
             else
                 cbe.time = time[count] +
                            planeEventQueue[count].back().time;
+            cbe.function = NULL;
             planeEventQueue[count].push_back(cbe);
 
             DPRINTF(FlashDevice, "scheduled at: %ld\n", cbe.time);
@@ -307,13 +308,14 @@ FlashDevice::actionComplete()
                  * the callback entry first need to be cleared before it can
                  * be called.
                  */
-                auto temp = planeEventQueue[plane_address].front().function;
+                Callback *temp = planeEventQueue[plane_address].front().
+                                 function;
                 planeEventQueue[plane_address].pop_front();
 
                 /**Found a callback, lets make it happen*/
-                if (temp) {
+                if (temp != NULL) {
                     DPRINTF(FlashDevice, "Callback, %d\n", plane_address);
-                    temp();
+                    temp->process();
                 }
             }
         }

@@ -52,11 +52,9 @@
 #include <cstring>
 #include <vector>
 
-#include "base/trace.hh"
 #include "base/types.hh"
 #include "debug/DistEthernet.hh"
 #include "debug/DistEthernetCmd.hh"
-#include "sim/core.hh"
 #include "sim/sim_exit.hh"
 
 #if defined(__FreeBSD__)
@@ -87,7 +85,7 @@ TCPIface::TCPIface(string server_name, unsigned server_port,
               is_switch, num_nodes), serverName(server_name),
     serverPort(server_port), isSwitch(is_switch), listening(false)
 {
-    if (is_switch && isPrimary) {
+    if (is_switch && isMaster) {
         while (!listen(serverPort)) {
             DPRINTF(DistEthernet, "TCPIface(listen): Can't bind port %d\n",
                     serverPort);
@@ -253,7 +251,7 @@ TCPIface::connect()
 
 TCPIface::~TCPIface()
 {
-    M5_VAR_USED int ret;
+    int M5_VAR_USED ret;
 
     ret = close(sock);
     assert(ret == 0);
@@ -307,7 +305,7 @@ TCPIface::sendCmd(const Header &header)
 {
     DPRINTF(DistEthernetCmd, "TCPIface::sendCmd() type: %d\n",
             static_cast<int>(header.msgType));
-    // Global commands (i.e. sync request) are always sent by the primary
+    // Global commands (i.e. sync request) are always sent by the master
     // DistIface. The transfer method is simply implemented as point-to-point
     // messages for now
     for (auto s: sockRegistry)

@@ -46,7 +46,6 @@
 #include "arch/arm/miscregs.hh"
 #include "arch/arm/types.hh"
 #include "arch/generic/decode_cache.hh"
-#include "arch/generic/decoder.hh"
 #include "base/types.hh"
 #include "cpu/static_inst.hh"
 #include "enums/DecoderFlavor.hh"
@@ -55,7 +54,7 @@ namespace ArmISA
 {
 
 class ISA;
-class Decoder : public InstDecoder
+class Decoder
 {
   protected:
     //The extended machine instruction being generated

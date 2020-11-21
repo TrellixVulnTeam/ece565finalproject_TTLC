@@ -91,7 +91,9 @@ InstPBTrace::createTraceFile(std::string filename)
     traceStream->write(header_msg);
 
     // get a callback when we exit so we can close the file
-    registerExitCallback([this]() { closeStreams(); });
+    Callback *cb = new MakeCallback<InstPBTrace,
+             &InstPBTrace::closeStreams>(this);
+    registerExitCallback(cb);
 }
 
 void

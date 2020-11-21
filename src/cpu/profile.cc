@@ -30,6 +30,7 @@
 
 #include <string>
 
+#include "base/bitfield.hh"
 #include "base/callback.hh"
 #include "base/loader/symtab.hh"
 #include "base/statistics.hh"
@@ -37,51 +38,39 @@
 #include "cpu/base.hh"
 #include "cpu/thread_context.hh"
 
-void
-BaseStackTrace::dump()
-{
-    StringWrap name(tc->getCpuPtr()->name());
-    auto *symtab = &tc->getSystemPtr()->workload->symtab(tc);
+using namespace std;
 
-    DPRINTFN("------ Stack ------\n");
-
-    std::string symbol;
-    for (int i = 0, size = stack.size(); i < size; ++i) {
-        Addr addr = stack[size - i - 1];
-        getSymbol(symbol, addr, symtab);
-        DPRINTFN("%#x: %s\n", addr, symbol);
-    }
-}
-
-bool
-BaseStackTrace::tryGetSymbol(std::string &symbol, Addr addr,
-                             const Loader::SymbolTable *symtab)
-{
-    const auto it = symtab->find(addr);
-    if (it == symtab->end())
-        return false;
-    symbol = it->name;
-    return true;
-}
+ProfileNode::ProfileNode()
+    : count(0)
+{ }
 
 void
-ProfileNode::dump(const std::string &symbol, uint64_t id,
-                  const FunctionProfile &prof, std::ostream &os) const
+ProfileNode::dump(const string &symbol, uint64_t id,
+                  const Loader::SymbolTable *symtab, ostream &os) const
 {
     ccprintf(os, "%#x %s %d ", id, symbol, count);
-    for (const auto &p: children)
-        ccprintf(os, "%#x ", (intptr_t)(p.second));
+    ChildList::const_iterator i, end = children.end();
+    for (i = children.begin(); i != end; ++i) {
+        const ProfileNode *node = i->second;
+        ccprintf(os, "%#x ", (intptr_t)node);
+    }
 
     ccprintf(os, "\n");
 
-    for (const auto &p: children) {
-        Addr addr = p.first;
-        std::string symbol;
+    for (i = children.begin(); i != end; ++i) {
+        Addr addr = i->first;
+        string symbol;
+        if (addr == 1)
+            symbol = "user";
+        else if (addr == 2)
+            symbol = "console";
+        else if (addr == 3)
+            symbol = "unknown";
+        else if (!symtab->findSymbol(addr, symbol))
+            panic("could not find symbol for address %#x\n", addr);
 
-        prof.trace->getSymbol(symbol, addr, &prof.symtab);
-
-        const auto *node = p.second;
-        node->dump(symbol, (intptr_t)node, prof, os);
+        const ProfileNode *node = i->second;
+        node->dump(symbol, (intptr_t)node, symtab, os);
     }
 }
 
@@ -89,24 +78,31 @@ void
 ProfileNode::clear()
 {
     count = 0;
-    for (const auto &p: children)
-        p.second->clear();
+    ChildList::iterator i, end = children.end();
+    for (i = children.begin(); i != end; ++i)
+        i->second->clear();
 }
 
-FunctionProfile::FunctionProfile(std::unique_ptr<BaseStackTrace> _trace,
-                                 const Loader::SymbolTable &_symtab) :
-    symtab(_symtab), trace(std::move(_trace))
+FunctionProfile::FunctionProfile(const Loader::SymbolTable *_symtab)
+    : reset(0), symtab(_symtab)
 {
-    Stats::registerResetCallback([this]() { clear(); });
+    reset = new MakeCallback<FunctionProfile, &FunctionProfile::clear>(this);
+    Stats::registerResetCallback(reset);
+}
+
+FunctionProfile::~FunctionProfile()
+{
+    if (reset)
+        delete reset;
 }
 
 ProfileNode *
-FunctionProfile::consume(const std::vector<Addr> &stack)
+FunctionProfile::consume(const vector<Addr> &stack)
 {
     ProfileNode *current = &top;
     for (int i = 0, size = stack.size(); i < size; ++i) {
         ProfileNode *&ptr = current->children[stack[size - i - 1]];
-        if (!ptr)
+        if (ptr == NULL)
             ptr = new ProfileNode;
 
         current = ptr;
@@ -123,22 +119,25 @@ FunctionProfile::clear()
 }
 
 void
-FunctionProfile::dump(std::ostream &os) const
+FunctionProfile::dump(ThreadContext *tc, ostream &os) const
 {
     ccprintf(os, ">>>PC data\n");
-    for (const auto &p: pc_count) {
-        Addr pc = p.first;
-        Counter count = p.second;
+    map<Addr, Counter>::const_iterator i, end = pc_count.end();
+    for (i = pc_count.begin(); i != end; ++i) {
+        Addr pc = i->first;
+        Counter count = i->second;
 
         std::string symbol;
-        if (trace->tryGetSymbol(symbol, pc, &symtab))
+        if (pc == 1)
+            ccprintf(os, "user %d\n", count);
+        else if (symtab->findSymbol(pc, symbol) && !symbol.empty())
             ccprintf(os, "%s %d\n", symbol, count);
         else
             ccprintf(os, "%#x %d\n", pc, count);
     }
 
     ccprintf(os, ">>>function data\n");
-    top.dump("top", 0, *this, os);
+    top.dump("top", 0, symtab, os);
 }
 
 void
@@ -146,9 +145,9 @@ FunctionProfile::sample(ProfileNode *node, Addr pc)
 {
     node->count++;
 
-    auto it = symtab.findNearest(pc);
-    if (it != symtab.end()) {
-        pc_count[it->address]++;
+    Addr symaddr;
+    if (symtab->findNearestAddr(pc, symaddr)) {
+        pc_count[symaddr]++;
     } else {
         // record PC even if we don't have a symbol to avoid
         // silently biasing the histogram

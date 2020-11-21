@@ -55,7 +55,7 @@ Pl011::Pl011(const Pl011Params *p)
       intEvent([this]{ generateInterrupt(); }, name()),
       control(0x300), fbrd(0), ibrd(0), lcrh(0), ifls(0x12),
       imsc(0), rawInt(0),
-      endOnEOT(p->end_on_eot), interrupt(p->interrupt->get()),
+      gic(p->gic), endOnEOT(p->end_on_eot), intNum(p->int_num),
       intDelay(p->int_delay)
 {
 }
@@ -137,7 +137,7 @@ Pl011::read(PacketPtr pkt)
       default:
         if (readId(pkt, AMBA_ID, pioAddr)) {
             // Hack for variable size accesses
-            data = pkt->getUintX(ByteOrder::little);
+            data = pkt->getLE<uint32_t>();
             break;
         }
 
@@ -272,7 +272,7 @@ Pl011::generateInterrupt()
             imsc, rawInt, maskInt());
 
     if (maskInt()) {
-        interrupt->raise();
+        gic->sendInt(intNum);
         DPRINTF(Uart, " -- Generated\n");
     }
 }
@@ -289,7 +289,7 @@ Pl011::setInterrupts(uint16_t ints, uint16_t mask)
         if (!intEvent.scheduled())
             schedule(intEvent, curTick() + intDelay);
     } else if (old_ints && !maskInt()) {
-        interrupt->clear();
+        gic->clearInt(intNum);
     }
 }
 

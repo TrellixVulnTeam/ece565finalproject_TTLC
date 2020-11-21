@@ -55,7 +55,7 @@ AmbaPioDevice::AmbaPioDevice(const Params *p, Addr pio_size)
 
 AmbaIntDevice::AmbaIntDevice(const Params *p, Addr pio_size)
     : AmbaPioDevice(p, pio_size),
-      interrupt(p->interrupt->get()), intDelay(p->int_delay)
+      intNum(p->int_num), gic(p->gic), intDelay(p->int_delay)
 {
 }
 
@@ -64,7 +64,7 @@ AmbaIntDevice::AmbaIntDevice(const Params *p, Addr pio_size)
 AmbaDmaDevice::AmbaDmaDevice(const Params *p, Addr pio_size)
     : DmaDevice(p), ambaId(AmbaVendor | p->amba_id),
       pioAddr(p->pio_addr), pioSize(pio_size),
-      pioDelay(p->pio_latency), interrupt(p->interrupt->get())
+      pioDelay(p->pio_latency),intNum(p->int_num), gic(p->gic)
 {
 }
 
@@ -80,7 +80,7 @@ AmbaDevice::readId(PacketPtr pkt, uint64_t amba_id, Addr pio_addr)
     DPRINTF(AMBA, "Returning %#x for offset %#x(%d)\n",
             (amba_id >> byte) & 0xFF,
             pkt->getAddr() - pio_addr, byte);
-
-    pkt->setUintX((amba_id >> byte) & 0xFF, ByteOrder::little);
+    assert(pkt->getSize() == 4);
+    pkt->setLE<uint32_t>((amba_id >> byte) & 0xFF);
     return true;
 }

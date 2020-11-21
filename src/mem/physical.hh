@@ -127,8 +127,6 @@ class PhysicalMemory : public Serializable
     // Let the user choose if we reserve swap space when calling mmap
     const bool mmapUsingNoReserve;
 
-    const std::string sharedBackstore;
-
     // The physical memory used to provide the memory in the simulated
     // system
     std::vector<BackingStoreEntry> backingStore;
@@ -160,8 +158,7 @@ class PhysicalMemory : public Serializable
      */
     PhysicalMemory(const std::string& _name,
                    const std::vector<AbstractMemory*>& _memories,
-                   bool mmap_using_noreserve,
-                   const std::string& shared_backstore);
+                   bool mmap_using_noreserve);
 
     /**
      * Unmap all the backing store we have used.

@@ -75,31 +75,23 @@ class BaseGdbRegCache
      * Return the pointer to the raw bytes buffer containing the
      * register values.  Each byte of this buffer is literally
      * encoded as two hex digits in the g or G RSP packet.
-     *
-     * @ingroup api_remote_gdb
      */
     virtual char *data() const = 0;
 
     /**
      * Return the size of the raw buffer, in bytes
      * (i.e., half of the number of digits in the g/G packet).
-     *
-     * @ingroup api_remote_gdb
      */
     virtual size_t size() const = 0;
 
     /**
      * Fill the raw buffer from the registers in the ThreadContext.
-     *
-     * @ingroup api_remote_gdb
      */
     virtual void getRegs(ThreadContext*) = 0;
 
     /**
      * Set the ThreadContext's registers from the values
      * in the raw buffer.
-     *
-     * @ingroup api_remote_gdb
      */
     virtual void setRegs(ThreadContext*) const = 0;
 
@@ -108,14 +100,9 @@ class BaseGdbRegCache
      * Having each concrete superclass redefine this member
      * is useful in situations where the class of the regCache
      * can change on the fly.
-     *
-     * @ingroup api_remote_gdb
      */
     virtual const std::string name() const = 0;
 
-    /**
-     * @ingroup api_remote_gdb
-     */
     BaseGdbRegCache(BaseRemoteGDB *g) : gdb(g)
     {}
     virtual ~BaseGdbRegCache()
@@ -130,12 +117,7 @@ class BaseRemoteGDB
     friend class HardBreakpoint;
   public:
 
-    /**
-     * @ingroup api_remote_gdb
-     * @{
-     */
-
-    /**
+    /*
      * Interface to other parts of the simulator.
      */
     BaseRemoteGDB(System *system, ThreadContext *context, int _port);
@@ -156,8 +138,6 @@ class BaseRemoteGDB
 
     bool trap(int type);
     bool breakpoint() { return trap(SIGTRAP); }
-
-    /** @} */ // end of api_remote_gdb
 
   private:
     /*

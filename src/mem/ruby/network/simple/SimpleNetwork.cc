@@ -1,5 +1,4 @@
 /*
- * Copyright (c) 2020 Advanced Micro Devices, Inc.
  * Copyright (c) 2019 ARM Limited
  * All rights reserved.
  *
@@ -84,36 +83,33 @@ SimpleNetwork::init()
 
 // From a switch to an endpoint node
 void
-SimpleNetwork::makeExtOutLink(SwitchID src, NodeID global_dest,
-                              BasicLink* link,
-                              std::vector<NetDest>& routing_table_entry)
+SimpleNetwork::makeExtOutLink(SwitchID src, NodeID dest, BasicLink* link,
+                           const NetDest& routing_table_entry)
 {
-    NodeID local_dest = getLocalNodeID(global_dest);
-    assert(local_dest < m_nodes);
+    assert(dest < m_nodes);
     assert(src < m_switches.size());
     assert(m_switches[src] != NULL);
 
     SimpleExtLink *simple_link = safe_cast<SimpleExtLink*>(link);
 
-    m_switches[src]->addOutPort(m_fromNetQueues[local_dest],
-                                routing_table_entry[0], simple_link->m_latency,
+    m_switches[src]->addOutPort(m_fromNetQueues[dest], routing_table_entry,
+                                simple_link->m_latency,
                                 simple_link->m_bw_multiplier);
 }
 
 // From an endpoint node to a switch
 void
-SimpleNetwork::makeExtInLink(NodeID global_src, SwitchID dest, BasicLink* link,
-                          std::vector<NetDest>& routing_table_entry)
+SimpleNetwork::makeExtInLink(NodeID src, SwitchID dest, BasicLink* link,
+                          const NetDest& routing_table_entry)
 {
-    NodeID local_src = getLocalNodeID(global_src);
-    assert(local_src < m_nodes);
-    m_switches[dest]->addInPort(m_toNetQueues[local_src]);
+    assert(src < m_nodes);
+    m_switches[dest]->addInPort(m_toNetQueues[src]);
 }
 
 // From a switch to a switch
 void
 SimpleNetwork::makeInternalLink(SwitchID src, SwitchID dest, BasicLink* link,
-                                std::vector<NetDest>& routing_table_entry,
+                                const NetDest& routing_table_entry,
                                 PortDirection src_outport,
                                 PortDirection dst_inport)
 {
@@ -132,7 +128,7 @@ SimpleNetwork::makeInternalLink(SwitchID src, SwitchID dest, BasicLink* link,
     SimpleIntLink *simple_link = safe_cast<SimpleIntLink*>(link);
 
     m_switches[dest]->addInPort(queues);
-    m_switches[src]->addOutPort(queues, routing_table_entry[0],
+    m_switches[src]->addOutPort(queues, routing_table_entry,
                                 simple_link->m_latency,
                                 simple_link->m_bw_multiplier);
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017, 2020 ARM Limited
+ * Copyright (c) 2017 ARM Limited
  * All rights reserved
  *
  * The license below extends only to copyright in the software and shall
@@ -157,11 +157,7 @@ class StaticInst : public RefCounted, public StaticInstFlags
 
     bool isNop()          const { return flags[IsNop]; }
 
-    bool
-    isMemRef() const
-    {
-        return flags[IsLoad] || flags[IsStore] || flags[IsAtomic];
-    }
+    bool isMemRef()       const { return flags[IsMemRef]; }
     bool isLoad()         const { return flags[IsLoad]; }
     bool isStore()        const { return flags[IsStore]; }
     bool isAtomic()       const { return flags[IsAtomic]; }
@@ -174,6 +170,7 @@ class StaticInst : public RefCounted, public StaticInstFlags
     bool isInteger()      const { return flags[IsInteger]; }
     bool isFloating()     const { return flags[IsFloating]; }
     bool isVector()       const { return flags[IsVector]; }
+    bool isCC()           const { return flags[IsCC]; }
 
     bool isControl()      const { return flags[IsControl]; }
     bool isCall()         const { return flags[IsCall]; }
@@ -182,22 +179,20 @@ class StaticInst : public RefCounted, public StaticInstFlags
     bool isIndirectCtrl() const { return flags[IsIndirectControl]; }
     bool isCondCtrl()     const { return flags[IsCondControl]; }
     bool isUncondCtrl()   const { return flags[IsUncondControl]; }
+    bool isCondDelaySlot() const { return flags[IsCondDelaySlot]; }
 
+    bool isThreadSync()   const { return flags[IsThreadSync]; }
     bool isSerializing()  const { return flags[IsSerializing] ||
                                       flags[IsSerializeBefore] ||
                                       flags[IsSerializeAfter]; }
     bool isSerializeBefore() const { return flags[IsSerializeBefore]; }
     bool isSerializeAfter() const { return flags[IsSerializeAfter]; }
     bool isSquashAfter() const { return flags[IsSquashAfter]; }
-    bool
-    isFullMemBarrier() const
-    {
-        return flags[IsReadBarrier] && flags[IsWriteBarrier];
-    }
-    bool isReadBarrier() const { return flags[IsReadBarrier]; }
+    bool isMemBarrier()   const { return flags[IsMemBarrier]; }
     bool isWriteBarrier() const { return flags[IsWriteBarrier]; }
     bool isNonSpeculative() const { return flags[IsNonSpeculative]; }
     bool isQuiesce() const { return flags[IsQuiesce]; }
+    bool isIprAccess() const { return flags[IsIprAccess]; }
     bool isUnverifiable() const { return flags[IsUnverifiable]; }
     bool isSyscall() const { return flags[IsSyscall]; }
     bool isMacroop() const { return flags[IsMacroop]; }
@@ -205,18 +200,8 @@ class StaticInst : public RefCounted, public StaticInstFlags
     bool isDelayedCommit() const { return flags[IsDelayedCommit]; }
     bool isLastMicroop() const { return flags[IsLastMicroop]; }
     bool isFirstMicroop() const { return flags[IsFirstMicroop]; }
-    // hardware transactional memory
-    // HtmCmds must be identified as such in order
-    // to provide them with necessary memory ordering semantics.
-    bool isHtmStart() const { return flags[IsHtmStart]; }
-    bool isHtmStop() const { return flags[IsHtmStop]; }
-    bool isHtmCancel() const { return flags[IsHtmCancel]; }
-
-    bool
-    isHtmCmd() const
-    {
-        return isHtmStart() || isHtmStop() || isHtmCancel();
-    }
+    //This flag doesn't do anything yet
+    bool isMicroBranch() const { return flags[IsMicroBranch]; }
     //@}
 
     void setFirstMicroop() { flags[IsFirstMicroop] = true; }

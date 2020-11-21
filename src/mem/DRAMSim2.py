@@ -34,7 +34,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 from m5.params import *
-from m5.objects.AbstractMemory import *
+from AbstractMemory import *
 
 # A wrapper for DRAMSim2 multi-channel memory controller
 class DRAMSim2(AbstractMemory):
@@ -42,7 +42,7 @@ class DRAMSim2(AbstractMemory):
     cxx_header = "mem/dramsim2.hh"
 
     # A single port for now
-    port = ResponsePort("This port sends responses and receives requests")
+    port = SlavePort("Slave port")
 
     deviceConfigFile = Param.String("ini/DDR3_micron_32M_8B_x8_sg15.ini",
                                     "Device configuration file")

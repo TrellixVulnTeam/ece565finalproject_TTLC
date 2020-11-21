@@ -145,12 +145,10 @@ Fiber::start()
 
     setStarted();
 
-    if (_setjmp(jmp) == 0) {
-        // Swap back to the parent context which is still considered "current",
-        // now that we're ready to go.
-        int ret = swapcontext(&ctx, &_currentFiber->ctx);
-        panic_if(ret == -1, strerror(errno));
-    }
+    // Swap back to the parent context which is still considered "current",
+    // now that we're ready to go.
+    int ret M5_VAR_USED = swapcontext(&ctx, &_currentFiber->ctx);
+    panic_if(ret == -1, strerror(errno));
 
     // Call main() when we're been reactivated for the first time.
     main();
@@ -177,8 +175,7 @@ Fiber::run()
     Fiber *prev = _currentFiber;
     Fiber *next = this;
     _currentFiber = next;
-    if (_setjmp(prev->jmp) == 0)
-        _longjmp(next->jmp, 1);
+    swapcontext(&prev->ctx, &next->ctx);
 }
 
 Fiber *Fiber::currentFiber() { return _currentFiber; }

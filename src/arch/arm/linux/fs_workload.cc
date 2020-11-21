@@ -76,16 +76,17 @@ FsLinux::initState()
     // to do this permanently, for but early bootup work
     // it is helpful.
     if (params()->early_kernel_symbols) {
-        auto phys_globals = kernelObj->symtab().globals()->mask(_loadAddrMask);
-        kernelSymtab.insert(*phys_globals);
-        Loader::debugSymbolTable.insert(*phys_globals);
+        kernelObj->loadGlobalSymbols(kernelSymtab, 0, 0, _loadAddrMask);
+        kernelObj->loadGlobalSymbols(
+                Loader::debugSymbolTable, 0, 0, _loadAddrMask);
     }
 
     // Setup boot data structure
+    Addr addr;
     // Check if the kernel image has a symbol that tells us it supports
     // device trees.
     bool kernel_has_fdt_support =
-        kernelSymtab.find("unflatten_device_tree") != kernelSymtab.end();
+        kernelSymtab->findAddress("unflatten_device_tree", addr);
     bool dtb_file_specified = params()->dtb_filename != "";
 
     if (kernel_has_fdt_support && dtb_file_specified) {
@@ -159,7 +160,7 @@ FsLinux::initState()
     }
 
     // Kernel boot requirements to set up r0, r1 and r2 in ARMv7
-    for (auto *tc: system->threads) {
+    for (auto tc: system->threadContexts) {
         tc->setIntReg(0, 0);
         tc->setIntReg(1, params()->machine_type);
         tc->setIntReg(2, params()->atags_addr + _loadAddrOffset);
@@ -175,6 +176,7 @@ FsLinux::~FsLinux()
     delete kernelPanic;
 
     delete dumpStats;
+    delete debugPrintk;
 }
 
 void
@@ -193,7 +195,7 @@ FsLinux::startup()
         std::string task_filename = "tasks.txt";
         taskFile = simout.create(name() + "." + task_filename);
 
-        for (auto *tc: system->threads) {
+        for (const auto tc : system->threadContexts) {
             uint32_t pid = tc->getCpuPtr()->getPid();
             if (pid != BaseCPU::invldPid) {
                 mapPid(tc, pid);
@@ -264,7 +266,7 @@ FsLinux::mapPid(ThreadContext *tc, uint32_t pid)
 void
 FsLinux::dumpDmesg()
 {
-    Linux::dumpDmesg(system->threads[0], std::cout);
+    Linux::dumpDmesg(system->getThreadContext(0), std::cout);
 }
 
 /**
@@ -359,8 +361,8 @@ DumpStats::process(ThreadContext *tc)
 
 } // namespace ArmISA
 
-ArmISA::FsLinux *
+FsLinux *
 ArmFsLinuxParams::create()
 {
-    return new ArmISA::FsLinux(this);
+    return new FsLinux(this);
 }

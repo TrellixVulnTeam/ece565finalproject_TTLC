@@ -51,12 +51,7 @@ class ChannelAddr
   public:
     using Type = Addr;
 
-    /**
-     * Explicit constructor assigning a value.
-     *
-     * @ingroup api_channel_addr
-     * @{
-     */
+    /** Explicit constructor assigning a value. */
     explicit constexpr ChannelAddr(Type _a) : a(_a) { }
 
     /** Converting back to the value type. */
@@ -136,8 +131,6 @@ class ChannelAddr
     constexpr bool operator==(const ChannelAddr &b) const { return a == b.a; }
     constexpr bool operator!=(const ChannelAddr &b) const { return a != b.a; }
 
-    /** @} */ // end of api_channel_addr
-
   private:
     /** Member holding the actual value. */
     Type a;
@@ -150,10 +143,6 @@ class ChannelAddr
 class ChannelAddrRange
 {
   public:
-    /**
-     * @ingroup api_channel_addr
-     * @{
-     */
     constexpr ChannelAddrRange()
         : ChannelAddrRange(ChannelAddr(1), ChannelAddr(0)) {}
 
@@ -176,8 +165,6 @@ class ChannelAddrRange
         return a >= _start && a <= _end;
     }
 
-    /** @} */ // end of api_channel_addr
-
   protected:
     ChannelAddr _start;
     ChannelAddr _end;
@@ -199,9 +186,6 @@ namespace std
     };
 }
 
-/**
- * @ingroup api_channel_addr
- */
 std::ostream &operator<<(std::ostream &out, const ChannelAddr &addr);
 
 #endif // __BASE_CHANNEL_ADDR_HH__

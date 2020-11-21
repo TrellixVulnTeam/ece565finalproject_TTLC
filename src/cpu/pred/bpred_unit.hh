@@ -68,6 +68,11 @@ class BPredUnit : public SimObject
      */
     BPredUnit(const Params *p);
 
+    /**
+     * Registers statistics.
+     */
+    void regStats() override;
+
     void regProbePoints() override;
 
     /** Perform sanity checks after a drain. */
@@ -172,7 +177,8 @@ class BPredUnit : public SimObject
      */
     virtual void update(ThreadID tid, Addr instPC, bool taken,
                    void *bp_history, bool squashed,
-                   const StaticInstPtr &inst, Addr corrTarget) = 0;
+                   const StaticInstPtr & inst = StaticInst::nullStaticInstPtr,
+                   Addr corrTarget = MaxAddr) = 0;
     /**
      * Updates the BTB with the target of a branch.
      * @param inst_PC The branch's PC that will be updated.
@@ -277,35 +283,33 @@ class BPredUnit : public SimObject
     /** The indirect target predictor. */
     IndirectPredictor * iPred;
 
-    struct BPredUnitStats : public Stats::Group {
-        BPredUnitStats(Stats::Group *parent);
+    /** Stat for number of BP lookups. */
+    Stats::Scalar lookups;
+    /** Stat for number of conditional branches predicted. */
+    Stats::Scalar condPredicted;
+    /** Stat for number of conditional branches predicted incorrectly. */
+    Stats::Scalar condIncorrect;
+    /** Stat for number of BTB lookups. */
+    Stats::Scalar BTBLookups;
+    /** Stat for number of BTB hits. */
+    Stats::Scalar BTBHits;
+    /** Stat for number of times the BTB is correct. */
+    Stats::Scalar BTBCorrect;
+    /** Stat for percent times an entry in BTB found. */
+    Stats::Formula BTBHitPct;
+    /** Stat for number of times the RAS is used to get a target. */
+    Stats::Scalar usedRAS;
+    /** Stat for number of times the RAS is incorrect. */
+    Stats::Scalar RASIncorrect;
 
-        /** Stat for number of BP lookups. */
-        Stats::Scalar lookups;
-        /** Stat for number of conditional branches predicted. */
-        Stats::Scalar condPredicted;
-        /** Stat for number of conditional branches predicted incorrectly. */
-        Stats::Scalar condIncorrect;
-        /** Stat for number of BTB lookups. */
-        Stats::Scalar BTBLookups;
-        /** Stat for number of BTB hits. */
-        Stats::Scalar BTBHits;
-        /** Stat for percent times an entry in BTB found. */
-        Stats::Formula BTBHitPct;
-        /** Stat for number of times the RAS is used to get a target. */
-        Stats::Scalar RASUsed;
-        /** Stat for number of times the RAS is incorrect. */
-        Stats::Scalar RASIncorrect;
-
-        /** Stat for the number of indirect target lookups.*/
-        Stats::Scalar indirectLookups;
-        /** Stat for the number of indirect target hits.*/
-        Stats::Scalar indirectHits;
-        /** Stat for the number of indirect target misses.*/
-        Stats::Scalar indirectMisses;
-        /** Stat for the number of indirect target mispredictions.*/
-        Stats::Scalar indirectMispredicted;
-    } stats;
+    /** Stat for the number of indirect target lookups.*/
+    Stats::Scalar indirectLookups;
+    /** Stat for the number of indirect target hits.*/
+    Stats::Scalar indirectHits;
+    /** Stat for the number of indirect target misses.*/
+    Stats::Scalar indirectMisses;
+    /** Stat for the number of indirect target mispredictions.*/
+    Stats::Scalar indirectMispredicted;
 
   protected:
     /** Number of bits to shift instructions by for predictor addresses. */

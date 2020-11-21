@@ -50,7 +50,3 @@ class KernelWorkload(Workload):
     load_addr_offset = Param.UInt64(0, "Address to offset the kernel with")
 
     command_line = Param.String("a", "boot flags to pass to the kernel")
-
-class SEWorkload(Workload):
-    type = 'SEWorkload'
-    cxx_header = "sim/se_workload.hh"

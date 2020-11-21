@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011,2013,2017-2018, 2020 ARM Limited
+ * Copyright (c) 2011,2013,2017-2018 ARM Limited
  * All rights reserved
  *
  * The license below extends only to copyright in the software and shall
@@ -58,7 +58,7 @@ using namespace TheISA;
 void
 CheckerCPU::init()
 {
-    requestorId = systemPtr->getRequestorId(this);
+    masterId = systemPtr->getMasterId(this);
 }
 
 CheckerCPU::CheckerCPU(Params *p)
@@ -99,7 +99,8 @@ CheckerCPU::setSystem(System *system)
     systemPtr = system;
 
     if (FullSystem) {
-        thread = new SimpleThread(this, 0, systemPtr, itb, dtb, p->isa[0]);
+        thread = new SimpleThread(this, 0, systemPtr, itb, dtb,
+                                  p->isa[0], false);
     } else {
         thread = new SimpleThread(this, 0, systemPtr,
                                   workload.size() ? workload[0] : NULL,
@@ -108,18 +109,19 @@ CheckerCPU::setSystem(System *system)
 
     tc = thread->getTC();
     threadContexts.push_back(tc);
+    thread->kernelStats = NULL;
     // Thread should never be null after this
     assert(thread != NULL);
 }
 
 void
-CheckerCPU::setIcachePort(RequestPort *icache_port)
+CheckerCPU::setIcachePort(MasterPort *icache_port)
 {
     icachePort = icache_port;
 }
 
 void
-CheckerCPU::setDcachePort(RequestPort *dcache_port)
+CheckerCPU::setDcachePort(MasterPort *dcache_port)
 {
     dcachePort = dcache_port;
 }
@@ -147,15 +149,21 @@ CheckerCPU::genMemFragmentRequest(Addr frag_addr, int size,
 
     RequestPtr mem_req;
 
-    // Set up byte-enable mask for the current fragment
-    auto it_start = byte_enable.cbegin() + (size - (frag_size +
-                                                    size_left));
-    auto it_end = byte_enable.cbegin() + (size - size_left);
-    if (isAnyActiveElement(it_start, it_end)) {
+    if (!byte_enable.empty()) {
+        // Set up byte-enable mask for the current fragment
+        auto it_start = byte_enable.cbegin() + (size - (frag_size +
+                                                        size_left));
+        auto it_end = byte_enable.cbegin() + (size - size_left);
+        if (isAnyActiveElement(it_start, it_end)) {
+            mem_req = std::make_shared<Request>(frag_addr, frag_size,
+                    flags, masterId, thread->pcState().instAddr(),
+                    tc->contextId());
+            mem_req->setByteEnable(std::vector<bool>(it_start, it_end));
+        }
+    } else {
         mem_req = std::make_shared<Request>(frag_addr, frag_size,
-                flags, requestorId, thread->pcState().instAddr(),
-                tc->contextId());
-        mem_req->setByteEnable(std::vector<bool>(it_start, it_end));
+                    flags, masterId, thread->pcState().instAddr(),
+                    tc->contextId());
     }
 
     return mem_req;
@@ -166,7 +174,7 @@ CheckerCPU::readMem(Addr addr, uint8_t *data, unsigned size,
                     Request::Flags flags,
                     const std::vector<bool>& byte_enable)
 {
-    assert(byte_enable.size() == size);
+    assert(byte_enable.empty() || byte_enable.size() == size);
 
     Fault fault = NoFault;
     bool checked_flags = false;
@@ -250,7 +258,7 @@ CheckerCPU::writeMem(uint8_t *data, unsigned size,
                      Addr addr, Request::Flags flags, uint64_t *res,
                      const std::vector<bool>& byte_enable)
 {
-    assert(byte_enable.size() == size);
+    assert(byte_enable.empty() || byte_enable.size() == size);
 
     Fault fault = NoFault;
     bool checked_flags = false;

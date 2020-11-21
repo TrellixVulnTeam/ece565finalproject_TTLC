@@ -194,7 +194,8 @@ BreakpointFault::invokeSE(ThreadContext *tc, const StaticInstPtr &inst)
 void
 SyscallFault::invokeSE(ThreadContext *tc, const StaticInstPtr &inst)
 {
-    tc->getSystemPtr()->workload->syscall(tc);
+    Fault *fault = NoFault;
+    tc->syscall(fault);
 }
 
 } // namespace RiscvISA

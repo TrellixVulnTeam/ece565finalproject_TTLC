@@ -35,6 +35,7 @@
 
 #include "cpu/thread_context.hh"
 #include "sim/system.hh"
+#include "sim/vptr.hh"
 
 namespace FreeBSD {
 

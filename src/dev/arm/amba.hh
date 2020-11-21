@@ -43,12 +43,12 @@
 namespace AMBA
 {
 
-typedef RequestorID OrderID;
+typedef MasterID OrderID;
 
 static OrderID
 orderId(PacketPtr pkt)
 {
-    return pkt->req->requestorId();
+    return pkt->req->masterId();
 }
 
 } // namespace AMBA

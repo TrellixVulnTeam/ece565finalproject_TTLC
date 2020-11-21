@@ -38,15 +38,14 @@ SimpleCache::SimpleCache(SimpleCacheParams *params) :
     blockSize(params->system->cacheLineSize()),
     capacity(params->size / blockSize),
     memPort(params->name + ".mem_side", this),
-    blocked(false), originalPacket(nullptr), waitingPortId(-1), stats(this)
+    blocked(false), originalPacket(nullptr), waitingPortId(-1)
 {
     // Since the CPU side ports are a vector of ports, create an instance of
     // the CPUSidePort for each connection. This member of params is
     // automatically created depending on the name of the vector port and
     // holds the number of connections to this port name
     for (int i = 0; i < params->port_cpu_side_connection_count; ++i) {
-        cpuPorts.emplace_back(name() + csprintf(".cpu_side[%d]", i),
-                                                             i, this);
+        cpuPorts.emplace_back(name() + csprintf(".cpu_side[%d]", i), i, this);
     }
 }
 
@@ -222,7 +221,7 @@ SimpleCache::handleResponse(PacketPtr pkt)
     // for any added latency.
     insert(pkt);
 
-    stats.missLatency.sample(curTick() - missTime);
+    missLatency.sample(curTick() - missTime);
 
     // If we had to upgrade the request packet to a full cache line, now we
     // can use that packet to construct the response.
@@ -230,7 +229,7 @@ SimpleCache::handleResponse(PacketPtr pkt)
         DPRINTF(SimpleCache, "Copying data from new packet to old\n");
         // We had to upgrade a previous packet. We can functionally deal with
         // the cache access now. It better be a hit.
-        M5_VAR_USED bool hit = accessFunctional(originalPacket);
+        bool hit M5_VAR_USED = accessFunctional(originalPacket);
         panic_if(!hit, "Should always hit after inserting");
         originalPacket->makeResponse();
         delete pkt; // We may need to delay this, I'm not sure.
@@ -287,12 +286,12 @@ SimpleCache::accessTiming(PacketPtr pkt)
 
     if (hit) {
         // Respond to the CPU side
-        stats.hits++; // update stats
+        hits++; // update stats
         DDUMP(SimpleCache, pkt->getConstPtr<uint8_t>(), pkt->getSize());
         pkt->makeResponse();
         sendResponse(pkt);
     } else {
-        stats.misses++; // update stats
+        misses++; // update stats
         missTime = curTick();
         // Forward to the memory side.
         // We can't directly forward the packet unless it is exactly the size
@@ -422,15 +421,31 @@ SimpleCache::sendRangeChange() const
     }
 }
 
-SimpleCache::SimpleCacheStats::SimpleCacheStats(Stats::Group *parent)
-      : Stats::Group(parent),
-      ADD_STAT(hits, "Number of hits"),
-      ADD_STAT(misses, "Number of misses"),
-      ADD_STAT(missLatency, "Ticks for misses to the cache"),
-      ADD_STAT(hitRatio, "The ratio of hits to the total"
-                 "accesses to the cache", hits / (hits + misses))
+void
+SimpleCache::regStats()
 {
-    missLatency.init(16); // number of buckets
+    // If you don't do this you get errors about uninitialized stats.
+    ClockedObject::regStats();
+
+    hits.name(name() + ".hits")
+        .desc("Number of hits")
+        ;
+
+    misses.name(name() + ".misses")
+        .desc("Number of misses")
+        ;
+
+    missLatency.name(name() + ".missLatency")
+        .desc("Ticks for misses to the cache")
+        .init(16) // number of buckets
+        ;
+
+    hitRatio.name(name() + ".hitRatio")
+        .desc("The ratio of hits to the total accesses to the cache")
+        ;
+
+    hitRatio = hits / (hits + misses);
+
 }
 
 

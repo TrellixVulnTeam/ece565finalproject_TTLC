@@ -56,10 +56,18 @@ enum InterruptTypes
 class Interrupts : public BaseInterrupts
 {
   private:
+    BaseCPU * cpu;
+
     uint64_t interrupts[NumInterruptTypes];
     uint64_t intStatus;
 
   public:
+
+    void
+    setCPU(BaseCPU * _cpu) override
+    {
+        cpu = _cpu;
+    }
 
     typedef SparcInterruptsParams Params;
 
@@ -69,7 +77,7 @@ class Interrupts : public BaseInterrupts
         return dynamic_cast<const Params *>(_params);
     }
 
-    Interrupts(Params * p) : BaseInterrupts(p)
+    Interrupts(Params * p) : BaseInterrupts(p), cpu(NULL)
     {
         clearAll();
     }
@@ -121,7 +129,7 @@ class Interrupts : public BaseInterrupts
     }
 
     bool
-    checkInterrupts() const override
+    checkInterrupts(ThreadContext *tc) const override
     {
         if (!intStatus)
             return false;
@@ -179,9 +187,9 @@ class Interrupts : public BaseInterrupts
     }
 
     Fault
-    getInterrupt() override
+    getInterrupt(ThreadContext *tc) override
     {
-        assert(checkInterrupts());
+        assert(checkInterrupts(tc));
 
         HPSTATE hpstate = tc->readMiscRegNoEffect(MISCREG_HPSTATE);
         PSTATE pstate = tc->readMiscRegNoEffect(MISCREG_PSTATE);
@@ -235,7 +243,7 @@ class Interrupts : public BaseInterrupts
         return NoFault;
     }
 
-    void updateIntrInfo() override {}
+    void updateIntrInfo(ThreadContext *tc) override {}
 
     uint64_t
     get_vec(int int_num)

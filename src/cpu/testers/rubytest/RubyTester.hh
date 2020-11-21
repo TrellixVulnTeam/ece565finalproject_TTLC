@@ -57,7 +57,7 @@
 class RubyTester : public ClockedObject
 {
   public:
-    class CpuPort : public RequestPort
+    class CpuPort : public MasterPort
     {
       private:
         RubyTester *tester;
@@ -73,7 +73,7 @@ class RubyTester : public ClockedObject
 
         CpuPort(const std::string &_name, RubyTester *_tester, PortID _id,
                 PortID _index)
-            : RequestPort(_name, _tester, _id), tester(_tester),
+            : MasterPort(_name, _tester, _id), tester(_tester),
               globalIdx(_index)
         {}
 
@@ -101,8 +101,8 @@ class RubyTester : public ClockedObject
     bool isInstOnlyCpuPort(int idx);
     bool isInstDataCpuPort(int idx);
 
-    RequestPort* getReadableCpuPort(int idx);
-    RequestPort* getWritableCpuPort(int idx);
+    MasterPort* getReadableCpuPort(int idx);
+    MasterPort* getWritableCpuPort(int idx);
 
     void init() override;
 
@@ -117,11 +117,11 @@ class RubyTester : public ClockedObject
     void print(std::ostream& out) const;
     bool getCheckFlush() { return m_check_flush; }
 
-    RequestorID requestorId() { return _requestorId; }
+    MasterID masterId() { return _masterId; }
   protected:
     EventFunctionWrapper checkStartEvent;
 
-    RequestorID _requestorId;
+    MasterID _masterId;
 
   private:
     void hitCallback(NodeID proc, SubBlock* data);
@@ -137,8 +137,8 @@ class RubyTester : public ClockedObject
 
     int m_num_cpus;
     uint64_t m_checks_completed;
-    std::vector<RequestPort*> writePorts;
-    std::vector<RequestPort*> readPorts;
+    std::vector<MasterPort*> writePorts;
+    std::vector<MasterPort*> readPorts;
     uint64_t m_checks_to_complete;
     int m_deadlock_threshold;
     int m_num_writers;

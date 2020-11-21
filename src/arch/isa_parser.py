@@ -166,7 +166,7 @@ class Template(object):
             if operands.predRead:
                 myDict['op_decl'] += 'uint8_t _sourceIndex = 0;\n'
             if operands.predWrite:
-                myDict['op_decl'] += 'M5_VAR_USED uint8_t _destIndex = 0;\n'
+                myDict['op_decl'] += 'uint8_t M5_VAR_USED _destIndex = 0;\n'
 
             is_src = lambda op: op.is_src
             is_dest = lambda op: op.is_dest
@@ -1076,7 +1076,7 @@ class MemOperand(Operand):
 
     def makeDecl(self):
         # Declare memory data variable.
-        return '%s %s = {};\n' % (self.ctype, self.base_name)
+        return '%s %s;\n' % (self.ctype, self.base_name)
 
     def makeRead(self, predRead):
         if self.read_code != None:
@@ -1294,7 +1294,7 @@ class OperandList(object):
 class SubOperandList(OperandList):
     '''Find all the operands in the given code block.  Returns an operand
     descriptor list (instance of class OperandList).'''
-    def __init__(self, parser, code, requestor_list):
+    def __init__(self, parser, code, master_list):
         self.items = []
         self.bases = {}
         # delete strings and comments so we don't match on operands inside
@@ -1315,17 +1315,17 @@ class SubOperandList(OperandList):
             if op_base in parser.elemToVector:
                 elem_op = op_base
                 op_base = parser.elemToVector[elem_op]
-            # find this op in the requestor list
-            op_desc = requestor_list.find_base(op_base)
+            # find this op in the master list
+            op_desc = master_list.find_base(op_base)
             if not op_desc:
-                error('Found operand %s which is not in the requestor list!'
+                error('Found operand %s which is not in the master list!'
                       % op_base)
             else:
                 # See if we've already found this operand
                 op_desc = self.find_base(op_base)
                 if not op_desc:
                     # if not, add a reference to it to this sub list
-                    self.append(requestor_list.bases[op_base])
+                    self.append(master_list.bases[op_base])
 
             # start next search after end of current match
             next_pos = match.end()
@@ -2082,8 +2082,7 @@ del wrap
     # 'def [signed] bitfield <ID> [<first>:<last>]'
     # This generates a preprocessor macro in the output file.
     def p_def_bitfield_0(self, t):
-        'def_bitfield : DEF opt_signed ' \
-                'BITFIELD ID LESS INTLIT COLON INTLIT GREATER SEMI'
+        'def_bitfield : DEF opt_signed BITFIELD ID LESS INTLIT COLON INTLIT GREATER SEMI'
         expr = 'bits(machInst, %2d, %2d)' % (t[6], t[8])
         if (t[2] == 'signed'):
             expr = 'sext<%d>(%s)' % (t[6] - t[8] + 1, expr)

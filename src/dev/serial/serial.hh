@@ -38,8 +38,7 @@
 #ifndef __DEV_SERIAL_HH__
 #define __DEV_SERIAL_HH__
 
-#include <functional>
-
+#include "base/callback.hh"
 #include "sim/sim_object.hh"
 
 struct SerialDeviceParams;
@@ -104,9 +103,9 @@ class SerialDevice : public SimObject
      * method. The interface layer may use this method to register a
      * callback that informs it of pending data.
      *
-     * @param c Callback from interface layer.
+     * @param c Callback instance from interface layer.
      */
-    void regInterfaceCallback(const std::function<void()> &callback);
+    void regInterfaceCallback(Callback *c);
 
     /**
      * Check if there is pending data from the serial device.
@@ -137,7 +136,7 @@ class SerialDevice : public SimObject
 
   private:
     /** Currently regisxtered host interface layer callback */
-    std::function<void()> interfaceCallback;
+    Callback *interfaceCallback;
 };
 
 /**

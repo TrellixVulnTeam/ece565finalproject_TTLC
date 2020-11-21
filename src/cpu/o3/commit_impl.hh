@@ -1,6 +1,6 @@
 /*
  * Copyright 2014 Google, Inc.
- * Copyright (c) 2010-2014, 2017, 2020 ARM Limited
+ * Copyright (c) 2010-2014, 2017 ARM Limited
  * All rights reserved
  *
  * The license below extends only to copyright in the software and shall
@@ -46,6 +46,7 @@
 #include <string>
 
 #include "arch/utility.hh"
+#include "base/cp_annotate.hh"
 #include "base/loader/symtab.hh"
 #include "base/logging.hh"
 #include "config/the_isa.hh"
@@ -60,7 +61,6 @@
 #include "debug/CommitRate.hh"
 #include "debug/Drain.hh"
 #include "debug/ExecFaulting.hh"
-#include "debug/HtmCpu.hh"
 #include "debug/O3PipeView.hh"
 #include "params/DerivO3CPU.hh"
 #include "sim/faults.hh"
@@ -92,8 +92,7 @@ DefaultCommit<Impl>::DefaultCommit(O3CPU *_cpu, DerivO3CPUParams *params)
       drainImminent(false),
       trapLatency(params->trapLatency),
       canHandleInterrupts(true),
-      avoidQuiesceLiveLock(false),
-      stats(_cpu, this)
+      avoidQuiesceLiveLock(false)
 {
     if (commitWidth > Impl::MaxWidth)
         fatal("commitWidth (%d) is larger than compiled limit (%d),\n"
@@ -123,8 +122,6 @@ DefaultCommit<Impl>::DefaultCommit(O3CPU *_cpu, DerivO3CPUParams *params)
         committedStores[tid] = false;
         checkEmptyROB[tid] = false;
         renameMap[tid] = nullptr;
-        htmStarts[tid] = 0;
-        htmStops[tid] = 0;
     }
     interrupt = NoFault;
 }
@@ -146,91 +143,129 @@ DefaultCommit<Impl>::regProbePoints()
 }
 
 template <class Impl>
-DefaultCommit<Impl>::CommitStats::CommitStats(O3CPU *cpu,
-                                              DefaultCommit *commit)
-    : Stats::Group(cpu, "commit"),
-      ADD_STAT(commitSquashedInsts, "The number of squashed insts skipped by"
-          " commit"),
-      ADD_STAT(commitNonSpecStalls, "The number of times commit has been"
-          " forced to stall to communicate backwards"),
-      ADD_STAT(branchMispredicts, "The number of times a branch was"
-          " mispredicted"),
-      ADD_STAT(numCommittedDist, "Number of insts commited each cycle"),
-      ADD_STAT(instsCommitted, "Number of instructions committed"),
-      ADD_STAT(opsCommitted, "Number of ops (including micro ops) committed"),
-      ADD_STAT(memRefs, "Number of memory references committed"),
-      ADD_STAT(loads, "Number of loads committed"),
-      ADD_STAT(amos, "Number of atomic instructions committed"),
-      ADD_STAT(membars, "Number of memory barriers committed"),
-      ADD_STAT(branches, "Number of branches committed"),
-      ADD_STAT(vector, "Number of committed Vector instructions."),
-      ADD_STAT(floating, "Number of committed floating point"
-          " instructions."),
-      ADD_STAT(integer, "Number of committed integer instructions."),
-      ADD_STAT(functionCalls, "Number of function calls committed."),
-      ADD_STAT(committedInstType, "Class of committed instruction"),
-      ADD_STAT(commitEligibleSamples, "number cycles where commit BW limit"
-          " reached")
+void
+DefaultCommit<Impl>::regStats()
 {
     using namespace Stats;
+    commitSquashedInsts
+        .name(name() + ".commitSquashedInsts")
+        .desc("The number of squashed insts skipped by commit")
+        .prereq(commitSquashedInsts);
 
-    commitSquashedInsts.prereq(commitSquashedInsts);
-    commitNonSpecStalls.prereq(commitNonSpecStalls);
-    branchMispredicts.prereq(branchMispredicts);
+    commitNonSpecStalls
+        .name(name() + ".commitNonSpecStalls")
+        .desc("The number of times commit has been forced to stall to "
+              "communicate backwards")
+        .prereq(commitNonSpecStalls);
+
+    branchMispredicts
+        .name(name() + ".branchMispredicts")
+        .desc("The number of times a branch was mispredicted")
+        .prereq(branchMispredicts);
 
     numCommittedDist
-        .init(0,commit->commitWidth,1)
-        .flags(Stats::pdf);
+        .init(0,commitWidth,1)
+        .name(name() + ".committed_per_cycle")
+        .desc("Number of insts commited each cycle")
+        .flags(Stats::pdf)
+        ;
 
     instsCommitted
         .init(cpu->numThreads)
-        .flags(total);
+        .name(name() + ".committedInsts")
+        .desc("Number of instructions committed")
+        .flags(total)
+        ;
 
     opsCommitted
         .init(cpu->numThreads)
-        .flags(total);
+        .name(name() + ".committedOps")
+        .desc("Number of ops (including micro ops) committed")
+        .flags(total)
+        ;
 
-    memRefs
+    statComSwp
         .init(cpu->numThreads)
-        .flags(total);
+        .name(name() + ".swp_count")
+        .desc("Number of s/w prefetches committed")
+        .flags(total)
+        ;
 
-    loads
+    statComRefs
         .init(cpu->numThreads)
-        .flags(total);
+        .name(name() +  ".refs")
+        .desc("Number of memory references committed")
+        .flags(total)
+        ;
 
-    amos
+    statComLoads
         .init(cpu->numThreads)
-        .flags(total);
+        .name(name() +  ".loads")
+        .desc("Number of loads committed")
+        .flags(total)
+        ;
 
-    membars
+    statComAmos
         .init(cpu->numThreads)
-        .flags(total);
+        .name(name() +  ".amos")
+        .desc("Number of atomic instructions committed")
+        .flags(total)
+        ;
 
-    branches
+    statComMembars
         .init(cpu->numThreads)
-        .flags(total);
+        .name(name() +  ".membars")
+        .desc("Number of memory barriers committed")
+        .flags(total)
+        ;
 
-    vector
+    statComBranches
         .init(cpu->numThreads)
-        .flags(total);
+        .name(name() + ".branches")
+        .desc("Number of branches committed")
+        .flags(total)
+        ;
 
-    floating
+    statComFloating
         .init(cpu->numThreads)
-        .flags(total);
+        .name(name() + ".fp_insts")
+        .desc("Number of committed floating point instructions.")
+        .flags(total)
+        ;
 
-    integer
+    statComVector
         .init(cpu->numThreads)
-        .flags(total);
+        .name(name() + ".vec_insts")
+        .desc("Number of committed Vector instructions.")
+        .flags(total)
+        ;
 
-    functionCalls
-        .init(commit->numThreads)
-        .flags(total);
+    statComInteger
+        .init(cpu->numThreads)
+        .name(name()+".int_insts")
+        .desc("Number of committed integer instructions.")
+        .flags(total)
+        ;
 
-    committedInstType
-        .init(commit->numThreads,Enums::Num_OpClass)
-        .flags(total | pdf | dist);
+    statComFunctionCalls
+        .init(cpu->numThreads)
+        .name(name()+".function_calls")
+        .desc("Number of function calls committed.")
+        .flags(total)
+        ;
 
-    committedInstType.ysubnames(Enums::OpClassStrings);
+    statCommittedInstType
+        .init(numThreads,Enums::Num_OpClass)
+        .name(name() + ".op_class")
+        .desc("Class of committed instruction")
+        .flags(total | pdf | dist)
+        ;
+    statCommittedInstType.ysubnames(Enums::OpClassStrings);
+
+    commitEligibleSamples
+        .name(name() + ".bw_lim_events")
+        .desc("number cycles where commit BW limit reached")
+        ;
 }
 
 template <class Impl>
@@ -370,14 +405,6 @@ DefaultCommit<Impl>::drainSanityCheck() const
 {
     assert(isDrained());
     rob->drainSanityCheck();
-
-    // hardware transactional memory
-    // cannot drain partially through a transaction
-    for (ThreadID tid = 0; tid < numThreads; tid++) {
-        if (executingHtmTransaction(tid)) {
-            panic("cannot drain partially through a HTM transaction");
-        }
-    }
 }
 
 template <class Impl>
@@ -433,27 +460,6 @@ DefaultCommit<Impl>::deactivateThread(ThreadID tid)
 
     if (thread_it != priority_list.end()) {
         priority_list.erase(thread_it);
-    }
-}
-
-template <class Impl>
-bool
-DefaultCommit<Impl>::executingHtmTransaction(ThreadID tid) const
-{
-    if (tid == InvalidThreadID)
-        return false;
-    else
-        return (htmStarts[tid] > htmStops[tid]);
-}
-
-template <class Impl>
-void
-DefaultCommit<Impl>::resetHtmStartsStops(ThreadID tid)
-{
-    if (tid != InvalidThreadID)
-    {
-        htmStarts[tid] = 0;
-        htmStops[tid] = 0;
     }
 }
 
@@ -526,14 +532,6 @@ DefaultCommit<Impl>::generateTrapEvent(ThreadID tid, Fault inst_fault)
 
     Cycles latency = dynamic_pointer_cast<SyscallRetryFault>(inst_fault) ?
                      cpu->syscallRetryLatency : trapLatency;
-
-    // hardware transactional memory
-    if (inst_fault != nullptr &&
-        std::dynamic_pointer_cast<GenericHtmFailureFault>(inst_fault)) {
-        // TODO
-        // latency = default abort/restore latency
-        // could also do some kind of exponential back off if desired
-    }
 
     cpu->schedule(trap, cpu->clockEdge(latency));
     trapInFlight[tid] = true;
@@ -701,7 +699,7 @@ DefaultCommit<Impl>::tick()
             // will be active.
             _nextStatus = Active;
 
-            M5_VAR_USED const DynInstPtr &inst = rob->readHeadInst(tid);
+            const DynInstPtr &inst M5_VAR_USED = rob->readHeadInst(tid);
 
             DPRINTF(Commit,"[tid:%i] Instruction [sn:%llu] PC %s is head of"
                     " ROB and ready to commit\n",
@@ -735,8 +733,8 @@ void
 DefaultCommit<Impl>::handleInterrupt()
 {
     // Verify that we still have an interrupt to handle
-    if (!cpu->checkInterrupts(0)) {
-        DPRINTF(Commit, "Pending interrupt is cleared by requestor before "
+    if (!cpu->checkInterrupts(cpu->tcBase(0))) {
+        DPRINTF(Commit, "Pending interrupt is cleared by master before "
                 "it got handled. Restart fetching from the orig path.\n");
         toIEW->commitInfo[0].clearInterrupt = true;
         interrupt = NoFault;
@@ -815,7 +813,7 @@ DefaultCommit<Impl>::commit()
 {
     if (FullSystem) {
         // Check if we have a interrupt and get read to handle it
-        if (cpu->checkInterrupts(0))
+        if (cpu->checkInterrupts(cpu->tcBase(0)))
             propagateInterrupt();
     }
 
@@ -911,7 +909,7 @@ DefaultCommit<Impl>::commit()
                 if (toIEW->commitInfo[tid].mispredictInst->isUncondCtrl()) {
                      toIEW->commitInfo[tid].branchTaken = true;
                 }
-                ++stats.branchMispredicts;
+                ++branchMispredicts;
             }
 
             toIEW->commitInfo[tid].pc = fromIEW->pc[tid];
@@ -994,27 +992,12 @@ DefaultCommit<Impl>::commitInsts()
     // Commit as many instructions as possible until the commit bandwidth
     // limit is reached, or it becomes impossible to commit any more.
     while (num_committed < commitWidth) {
-        // hardware transactionally memory
-        // If executing within a transaction,
-        // need to handle interrupts specially
-
-        ThreadID commit_thread = getCommittingThread();
-
         // Check for any interrupt that we've already squashed for
         // and start processing it.
-        if (interrupt != NoFault) {
-            // If inside a transaction, postpone interrupts
-            if (executingHtmTransaction(commit_thread)) {
-                cpu->clearInterrupts(0);
-                toIEW->commitInfo[0].clearInterrupt = true;
-                interrupt = NoFault;
-                avoidQuiesceLiveLock = true;
-            } else {
-                handleInterrupt();
-            }
-        }
+        if (interrupt != NoFault)
+            handleInterrupt();
 
-        // ThreadID commit_thread = getCommittingThread();
+        ThreadID commit_thread = getCommittingThread();
 
         if (commit_thread == -1 || !rob->isHeadReady(commit_thread))
             break;
@@ -1038,7 +1021,7 @@ DefaultCommit<Impl>::commitInsts()
 
             rob->retireHead(commit_thread);
 
-            ++stats.commitSquashedInsts;
+            ++commitSquashedInsts;
             // Notify potential listeners that this instruction is squashed
             ppSquash->notify(head_inst);
 
@@ -1059,25 +1042,8 @@ DefaultCommit<Impl>::commitInsts()
 
             if (commit_success) {
                 ++num_committed;
-                stats.committedInstType[tid][head_inst->opClass()]++;
+                statCommittedInstType[tid][head_inst->opClass()]++;
                 ppCommit->notify(head_inst);
-
-                // hardware transactional memory
-
-                // update nesting depth
-                if (head_inst->isHtmStart())
-                    htmStarts[tid]++;
-
-                // sanity check
-                if (head_inst->inHtmTransactionalState()) {
-                    assert(executingHtmTransaction(tid));
-                } else {
-                    assert(!executingHtmTransaction(tid));
-                }
-
-                // update nesting depth
-                if (head_inst->isHtmStop())
-                    htmStops[tid]++;
 
                 changedROBNumEntries[tid] = true;
 
@@ -1159,7 +1125,7 @@ DefaultCommit<Impl>::commitInsts()
                 //
                 // If we don't do this, we might end up in a live lock situation
                 if (!interrupt && avoidQuiesceLiveLock &&
-                    onInstBoundary && cpu->checkInterrupts(0))
+                    onInstBoundary && cpu->checkInterrupts(cpu->tcBase(0)))
                     squashAfter(tid, head_inst);
             } else {
                 DPRINTF(Commit, "Unable to commit head instruction PC:%s "
@@ -1171,10 +1137,10 @@ DefaultCommit<Impl>::commitInsts()
     }
 
     DPRINTF(CommitRate, "%i\n", num_committed);
-    stats.numCommittedDist.sample(num_committed);
+    numCommittedDist.sample(num_committed);
 
     if (num_committed == commitWidth) {
-        stats.commitEligibleSamples++;
+        commitEligibleSamples++;
     }
 }
 
@@ -1196,7 +1162,7 @@ DefaultCommit<Impl>::commitHead(const DynInstPtr &head_inst, unsigned inst_num)
         // Make sure we are only trying to commit un-executed instructions we
         // think are possible.
         assert(head_inst->isNonSpeculative() || head_inst->isStoreConditional()
-               || head_inst->isReadBarrier() || head_inst->isWriteBarrier()
+               || head_inst->isMemBarrier() || head_inst->isWriteBarrier()
                || head_inst->isAtomic()
                || (head_inst->isLoad() && head_inst->strictlyOrdered()));
 
@@ -1227,31 +1193,19 @@ DefaultCommit<Impl>::commitHead(const DynInstPtr &head_inst, unsigned inst_num)
             toIEW->commitInfo[tid].strictlyOrdered = true;
             toIEW->commitInfo[tid].strictlyOrderedLoad = head_inst;
         } else {
-            ++stats.commitNonSpecStalls;
+            ++commitNonSpecStalls;
         }
 
         return false;
     }
 
+    if (head_inst->isThreadSync()) {
+        // Not handled for now.
+        panic("Thread sync instructions are not handled yet.\n");
+    }
+
     // Check if the instruction caused a fault.  If so, trap.
     Fault inst_fault = head_inst->getFault();
-
-    // hardware transactional memory
-    // if a fault occurred within a HTM transaction
-    // ensure that the transaction aborts
-    if (inst_fault != NoFault && head_inst->inHtmTransactionalState()) {
-        // There exists a generic HTM fault common to all ISAs
-        if (!std::dynamic_pointer_cast<GenericHtmFailureFault>(inst_fault)) {
-            DPRINTF(HtmCpu, "%s - fault (%s) encountered within transaction"
-                            " - converting to GenericHtmFailureFault\n",
-            head_inst->staticInst->getName(), inst_fault->name());
-            inst_fault = std::make_shared<GenericHtmFailureFault>(
-                head_inst->getHtmTransactionUid(),
-                HtmFailureFaultCause::EXCEPTION);
-        }
-        // If this point is reached and the fault inherits from the HTM fault,
-        // then there is no need to raise a new fault
-    }
 
     // Stores mark themselves as completed.
     if (!head_inst->isStore() && inst_fault == NoFault) {
@@ -1305,12 +1259,7 @@ DefaultCommit<Impl>::commitHead(const DynInstPtr &head_inst, unsigned inst_num)
             "[tid:%i] [sn:%llu] Committing instruction with fault\n",
             tid, head_inst->seqNum);
         if (head_inst->traceData) {
-            // We ignore ReExecution "faults" here as they are not real
-            // (architectural) faults but signal flush/replays.
-            if (DTRACE(ExecFaulting)
-                && dynamic_cast<ReExec*>(inst_fault.get()) == nullptr) {
-
-                head_inst->traceData->setFaulting(true);
+            if (DTRACE(ExecFaulting)) {
                 head_inst->traceData->setFetchSeq(head_inst->seqNum);
                 head_inst->traceData->setCPSeq(thread[tid]->numOp);
                 head_inst->traceData->dump();
@@ -1326,6 +1275,22 @@ DefaultCommit<Impl>::commitHead(const DynInstPtr &head_inst, unsigned inst_num)
 
     updateComInstStats(head_inst);
 
+    if (FullSystem) {
+        if (thread[tid]->profile) {
+            thread[tid]->profilePC = head_inst->instAddr();
+            ProfileNode *node = thread[tid]->profile->consume(
+                    thread[tid]->getTC(), head_inst->staticInst);
+
+            if (node)
+                thread[tid]->profileNode = node;
+        }
+        if (CPA::available()) {
+            if (head_inst->isControl()) {
+                ThreadContext *tc = thread[tid]->getTC();
+                CPA::cpa()->swAutoBegin(tc, head_inst->nextInstAddr());
+            }
+        }
+    }
     DPRINTF(Commit,
             "[tid:%i] [sn:%llu] Committing instruction with PC %s\n",
             tid, head_inst->seqNum, head_inst->pcState());
@@ -1347,11 +1312,6 @@ DefaultCommit<Impl>::commitHead(const DynInstPtr &head_inst, unsigned inst_num)
         renameMap[tid]->setEntry(head_inst->flattenedDestRegIdx(i),
                                  head_inst->renamedDestRegIdx(i));
     }
-
-    // hardware transactional memory
-    // the HTM UID is purely for correctness and debugging purposes
-    if (head_inst->isHtmStart())
-        iewStage->setLastRetiredHtmUid(tid, head_inst->getHtmTransactionUid());
 
     // Finally clear the head ROB entry.
     rob->retireHead(tid);
@@ -1432,8 +1392,8 @@ DefaultCommit<Impl>::updateComInstStats(const DynInstPtr &inst)
     ThreadID tid = inst->threadNumber;
 
     if (!inst->isMicroop() || inst->isLastMicroop())
-        stats.instsCommitted[tid]++;
-    stats.opsCommitted[tid]++;
+        instsCommitted[tid]++;
+    opsCommitted[tid]++;
 
     // To match the old model, don't count nops and instruction
     // prefetches towards the total commit count.
@@ -1445,41 +1405,41 @@ DefaultCommit<Impl>::updateComInstStats(const DynInstPtr &inst)
     //  Control Instructions
     //
     if (inst->isControl())
-        stats.branches[tid]++;
+        statComBranches[tid]++;
 
     //
     //  Memory references
     //
     if (inst->isMemRef()) {
-        stats.memRefs[tid]++;
+        statComRefs[tid]++;
 
         if (inst->isLoad()) {
-            stats.loads[tid]++;
+            statComLoads[tid]++;
         }
 
         if (inst->isAtomic()) {
-            stats.amos[tid]++;
+            statComAmos[tid]++;
         }
     }
 
-    if (inst->isFullMemBarrier()) {
-        stats.membars[tid]++;
+    if (inst->isMemBarrier()) {
+        statComMembars[tid]++;
     }
 
     // Integer Instruction
     if (inst->isInteger())
-        stats.integer[tid]++;
+        statComInteger[tid]++;
 
     // Floating Point Instruction
     if (inst->isFloating())
-        stats.floating[tid]++;
+        statComFloating[tid]++;
     // Vector Instruction
     if (inst->isVector())
-        stats.vector[tid]++;
+        statComVector[tid]++;
 
     // Function Calls
     if (inst->isCall())
-        stats.functionCalls[tid]++;
+        statComFunctionCalls[tid]++;
 
 }
 

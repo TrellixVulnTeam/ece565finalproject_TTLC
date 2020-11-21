@@ -49,7 +49,7 @@
 namespace RiscvISA
 {
 
-M5_VAR_USED const std::array<const char *, NumMiscRegs> MiscRegNames = {{
+const std::array<const char *, NumMiscRegs> M5_VAR_USED MiscRegNames = {{
     [MISCREG_PRV]           = "PRV",
     [MISCREG_ISA]           = "ISA",
     [MISCREG_VENDORID]      = "VENDORID",
@@ -243,7 +243,7 @@ ISA::readMiscRegNoEffect(int misc_reg) const
 }
 
 RegVal
-ISA::readMiscReg(int misc_reg)
+ISA::readMiscReg(int misc_reg, ThreadContext *tc)
 {
     switch (misc_reg) {
       case MISCREG_HARTID:
@@ -330,7 +330,7 @@ ISA::setMiscRegNoEffect(int misc_reg, RegVal val)
 }
 
 void
-ISA::setMiscReg(int misc_reg, RegVal val)
+ISA::setMiscReg(int misc_reg, RegVal val, ThreadContext *tc)
 {
     if (misc_reg >= MISCREG_CYCLE && misc_reg <= MISCREG_HPMCOUNTER31) {
         // Ignore writes to HPM counters for now

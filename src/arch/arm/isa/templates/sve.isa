@@ -64,7 +64,7 @@ class %(class_name)s : public %(base_class)s
         %(constructor)s;
     }
 
-    Fault execute(ExecContext *, Trace::InstRecord *) const override;
+    Fault execute(ExecContext *, Trace::InstRecord *) const;
 };
 }};
 
@@ -85,7 +85,7 @@ class %(class_name)s : public %(base_class)s
         %(constructor)s;
     }
 
-    Fault execute(ExecContext *, Trace::InstRecord *) const override;
+    Fault execute(ExecContext *, Trace::InstRecord *) const;
 };
 }};
 
@@ -106,7 +106,7 @@ class %(class_name)s : public %(base_class)s
         %(constructor)s;
     }
 
-    Fault execute(ExecContext *, Trace::InstRecord *) const override;
+    Fault execute(ExecContext *, Trace::InstRecord *) const;
 };
 }};
 
@@ -127,7 +127,7 @@ class %(class_name)s : public %(base_class)s
         %(constructor)s;
     }
 
-    Fault execute(ExecContext *, Trace::InstRecord *) const override;
+    Fault execute(ExecContext *, Trace::InstRecord *) const;
 };
 }};
 
@@ -148,7 +148,7 @@ class %(class_name)s : public %(base_class)s
         %(constructor)s;
     }
 
-    Fault execute(ExecContext *, Trace::InstRecord *) const override;
+    Fault execute(ExecContext *, Trace::InstRecord *) const;
 };
 }};
 
@@ -170,7 +170,7 @@ class %(class_name)s : public %(base_class)s
         %(constructor)s;
     }
 
-    Fault execute(ExecContext *, Trace::InstRecord *) const override;
+    Fault execute(ExecContext *, Trace::InstRecord *) const;
 };
 }};
 
@@ -191,7 +191,7 @@ class %(class_name)s : public %(base_class)s
         %(constructor)s;
     }
 
-    Fault execute(ExecContext *, Trace::InstRecord *) const override;
+    Fault execute(ExecContext *, Trace::InstRecord *) const;
 };
 }};
 
@@ -212,7 +212,7 @@ class %(class_name)s : public %(base_class)s
         %(constructor)s;
     }
 
-    Fault execute(ExecContext *, Trace::InstRecord *) const override;
+    Fault execute(ExecContext *, Trace::InstRecord *) const;
 };
 }};
 
@@ -233,7 +233,7 @@ class %(class_name)s : public %(base_class)s
         %(constructor)s;
     }
 
-    Fault execute(ExecContext *, Trace::InstRecord *) const override;
+    Fault execute(ExecContext *, Trace::InstRecord *) const;
 };
 }};
 
@@ -255,7 +255,7 @@ class %(class_name)s : public %(base_class)s
         %(constructor)s;
     }
 
-    Fault execute(ExecContext *, Trace::InstRecord *) const override;
+    Fault execute(ExecContext *, Trace::InstRecord *) const;
 };
 }};
 
@@ -276,7 +276,7 @@ class %(class_name)s : public %(base_class)s
         %(constructor)s;
     }
 
-    Fault execute(ExecContext *, Trace::InstRecord *) const override;
+    Fault execute(ExecContext *, Trace::InstRecord *) const;
 };
 }};
 
@@ -298,7 +298,7 @@ class %(class_name)s : public %(base_class)s
         %(constructor)s;
     }
 
-    Fault execute(ExecContext *, Trace::InstRecord *) const override;
+    Fault execute(ExecContext *, Trace::InstRecord *) const;
 };
 }};
 
@@ -320,7 +320,7 @@ class %(class_name)s : public %(base_class)s
         %(constructor)s;
     }
 
-    Fault execute(ExecContext *, Trace::InstRecord *) const override;
+    Fault execute(ExecContext *, Trace::InstRecord *) const;
 };
 }};
 
@@ -342,7 +342,7 @@ class %(class_name)s : public %(base_class)s
         %(constructor)s;
     }
 
-    Fault execute(ExecContext *, Trace::InstRecord *) const override;
+    Fault execute(ExecContext *, Trace::InstRecord *) const;
 };
 }};
 
@@ -364,7 +364,7 @@ class %(class_name)s : public %(base_class)s
         %(constructor)s;
     }
 
-    Fault execute(ExecContext *, Trace::InstRecord *) const override;
+    Fault execute(ExecContext *, Trace::InstRecord *) const;
 };
 }};
 
@@ -386,7 +386,7 @@ class %(class_name)s : public %(base_class)s
         %(constructor)s;
     }
 
-    Fault execute(ExecContext *, Trace::InstRecord *) const override;
+    Fault execute(ExecContext *, Trace::InstRecord *) const;
 };
 }};
 
@@ -408,7 +408,7 @@ class %(class_name)s : public %(base_class)s
         %(constructor)s;
     }
 
-    Fault execute(ExecContext *, Trace::InstRecord *) const override;
+    Fault execute(ExecContext *, Trace::InstRecord *) const;
 };
 }};
 
@@ -429,7 +429,7 @@ class %(class_name)s : public %(base_class)s
         %(constructor)s;
     }
 
-    Fault execute(ExecContext *, Trace::InstRecord *) const override;
+    Fault execute(ExecContext *, Trace::InstRecord *) const;
 };
 }};
 
@@ -450,7 +450,7 @@ class %(class_name)s : public %(base_class)s
         %(constructor)s;
     }
 
-    Fault execute(ExecContext *, Trace::InstRecord *) const override;
+    Fault execute(ExecContext *, Trace::InstRecord *) const;
 };
 }};
 
@@ -475,7 +475,7 @@ class %(class_name)s : public %(base_class)s
         %(constructor)s;
     }
 
-    Fault execute(ExecContext *, Trace::InstRecord *) const override;
+    Fault execute(ExecContext *, Trace::InstRecord *) const;
 };
 }};
 
@@ -496,7 +496,7 @@ class SveIndexII : public SveIndexIIOp
         %(constructor)s;
     }
 
-    Fault execute(ExecContext *, Trace::InstRecord *) const override;
+    Fault execute(ExecContext *, Trace::InstRecord *) const;
 };
 }};
 
@@ -517,7 +517,7 @@ class SveIndexIR : public SveIndexIROp
         %(constructor)s;
     }
 
-    Fault execute(ExecContext *, Trace::InstRecord *) const override;
+    Fault execute(ExecContext *, Trace::InstRecord *) const;
 };
 }};
 
@@ -538,7 +538,7 @@ class SveIndexRI : public SveIndexRIOp
         %(constructor)s;
     }
 
-    Fault execute(ExecContext *, Trace::InstRecord *) const override;
+    Fault execute(ExecContext *, Trace::InstRecord *) const;
 };
 }};
 
@@ -559,7 +559,7 @@ class SveIndexRR : public SveIndexRROp
         %(constructor)s;
     }
 
-    Fault execute(ExecContext *, Trace::InstRecord *) const override;
+    Fault execute(ExecContext *, Trace::InstRecord *) const;
 };
 }};
 
@@ -579,7 +579,7 @@ class %(class_name)s : public %(base_class)s
         %(constructor)s;
     }
 
-    Fault execute(ExecContext *, Trace::InstRecord *) const override;
+    Fault execute(ExecContext *, Trace::InstRecord *) const;
 };
 }};
 
@@ -599,7 +599,7 @@ class %(class_name)s : public %(base_class)s
         %(constructor)s;
     }
 
-    Fault execute(ExecContext *, Trace::InstRecord *) const override;
+    Fault execute(ExecContext *, Trace::InstRecord *) const;
 };
 
 }};
@@ -621,7 +621,7 @@ class %(class_name)s : public %(base_class)s
         %(constructor)s;
     }
 
-    Fault execute(ExecContext *, Trace::InstRecord *) const override;
+    Fault execute(ExecContext *, Trace::InstRecord *) const;
 };
 }};
 
@@ -643,7 +643,7 @@ class %(class_name)s : public %(base_class)s
         %(constructor)s;
     }
 
-    Fault execute(ExecContext *, Trace::InstRecord *) const override;
+    Fault execute(ExecContext *, Trace::InstRecord *) const;
 };
 }};
 
@@ -663,7 +663,7 @@ class %(class_name)s : public %(base_class)s
         %(constructor)s;
     }
 
-    Fault execute(ExecContext *, Trace::InstRecord *) const override;
+    Fault execute(ExecContext *, Trace::InstRecord *) const;
 };
 }};
 
@@ -681,7 +681,7 @@ class %(class_name)s : public %(base_class)s
         %(constructor)s;
     }
 
-    Fault execute(ExecContext *, Trace::InstRecord *) const override;
+    Fault execute(ExecContext *, Trace::InstRecord *) const;
 };
 }};
 
@@ -701,7 +701,7 @@ class %(class_name)s : public %(base_class)s
         %(constructor)s;
     }
 
-    Fault execute(ExecContext *, Trace::InstRecord *) const override;
+    Fault execute(ExecContext *, Trace::InstRecord *) const;
 };
 }};
 
@@ -722,7 +722,7 @@ class %(class_name)s : public %(base_class)s
         esize = sizeof(Element);
     }
 
-    Fault execute(ExecContext *, Trace::InstRecord *) const override;
+    Fault execute(ExecContext *, Trace::InstRecord *) const;
 };
 }};
 
@@ -738,7 +738,7 @@ class %(class_name)s : public %(base_class)s
         %(constructor)s;
     }
 
-    Fault execute(ExecContext *, Trace::InstRecord *) const override;
+    Fault execute(ExecContext *, Trace::InstRecord *) const;
 };
 }};
 
@@ -756,7 +756,7 @@ class %(class_name)s : public %(base_class)s
         %(constructor)s;
     }
 
-    Fault execute(ExecContext *, Trace::InstRecord *) const override;
+    Fault execute(ExecContext *, Trace::InstRecord *) const;
 };
 }};
 
@@ -777,7 +777,7 @@ class %(class_name)s : public %(base_class)s
         scalar_width = (sizeof(Element) == 8) ? 64 : 32;
     }
 
-    Fault execute(ExecContext *, Trace::InstRecord *) const override;
+    Fault execute(ExecContext *, Trace::InstRecord *) const;
 };
 }};
 
@@ -800,7 +800,7 @@ class %(class_name)s : public %(base_class)s
         %(constructor)s;
     }
 
-    Fault execute(ExecContext *, Trace::InstRecord *) const override;
+    Fault execute(ExecContext *, Trace::InstRecord *) const;
 };
 }};
 
@@ -814,7 +814,7 @@ class %(class_name)s : public %(base_class)s
         %(constructor)s;
     }
 
-    Fault execute(ExecContext *, Trace::InstRecord *) const override;
+    Fault execute(ExecContext *, Trace::InstRecord *) const;
 };
 }};
 
@@ -828,7 +828,7 @@ class %(class_name)s : public %(base_class)s
         %(constructor)s;
     }
 
-    Fault execute(ExecContext *, Trace::InstRecord *) const override;
+    Fault execute(ExecContext *, Trace::InstRecord *) const;
 };
 }};
 
@@ -842,7 +842,7 @@ class %(class_name)s : public %(base_class)s
         %(constructor)s;
     }
 
-    Fault execute(ExecContext *, Trace::InstRecord *) const override;
+    Fault execute(ExecContext *, Trace::InstRecord *) const;
 };
 }};
 
@@ -856,7 +856,7 @@ class %(class_name)s : public %(base_class)s
         %(constructor)s;
     }
 
-    Fault execute(ExecContext *, Trace::InstRecord *) const override;
+    Fault execute(ExecContext *, Trace::InstRecord *) const;
 };
 }};
 
@@ -870,7 +870,7 @@ class %(class_name)s : public %(base_class)s
         %(constructor)s;
     }
 
-    Fault execute(ExecContext *, Trace::InstRecord *) const override;
+    Fault execute(ExecContext *, Trace::InstRecord *) const;
 };
 }};
 
@@ -896,7 +896,7 @@ class %(class_name)s : public %(base_class)s
         esize = sizeof(Element);
     }
 
-    Fault execute(ExecContext *, Trace::InstRecord *) const override;
+    Fault execute(ExecContext *, Trace::InstRecord *) const;
 };
 }};
 
@@ -921,7 +921,7 @@ class %(class_name)s : public %(base_class)s
         esize = sizeof(Element);
     }
 
-    Fault execute(ExecContext *, Trace::InstRecord *) const override;
+    Fault execute(ExecContext *, Trace::InstRecord *) const;
 };
 }};
 
@@ -943,7 +943,7 @@ class %(class_name)s : public %(base_class)s
         %(constructor)s;
     }
 
-    Fault execute(ExecContext *, Trace::InstRecord *) const override;
+    Fault execute(ExecContext *, Trace::InstRecord *) const;
 };
 }};
 
@@ -965,7 +965,7 @@ class %(class_name)s : public %(base_class)s
         %(constructor)s;
     }
 
-    Fault execute(ExecContext *, Trace::InstRecord *) const override;
+    Fault execute(ExecContext *, Trace::InstRecord *) const;
 };
 }};
 

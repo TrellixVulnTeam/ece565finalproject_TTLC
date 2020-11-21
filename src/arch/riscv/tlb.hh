@@ -52,7 +52,7 @@ namespace RiscvISA {
 class Walker;
 
 class TLB : public BaseTLB
-  {
+{
     typedef std::list<TlbEntry *> EntryList;
 
   protected:
@@ -64,22 +64,17 @@ class TLB : public BaseTLB
 
     Walker *walker;
 
-    struct TlbStats : public Stats::Group{
-        TlbStats(Stats::Group *parent);
-
-        Stats::Scalar read_hits;
-        Stats::Scalar read_misses;
-        Stats::Scalar read_acv;
-        Stats::Scalar read_accesses;
-        Stats::Scalar write_hits;
-        Stats::Scalar write_misses;
-        Stats::Scalar write_acv;
-        Stats::Scalar write_accesses;
-
-        Stats::Formula hits;
-        Stats::Formula misses;
-        Stats::Formula accesses;
-    } stats;
+    mutable Stats::Scalar read_hits;
+    mutable Stats::Scalar read_misses;
+    mutable Stats::Scalar read_acv;
+    mutable Stats::Scalar read_accesses;
+    mutable Stats::Scalar write_hits;
+    mutable Stats::Scalar write_misses;
+    mutable Stats::Scalar write_acv;
+    mutable Stats::Scalar write_accesses;
+    Stats::Formula hits;
+    Stats::Formula misses;
+    Stats::Formula accesses;
 
   public:
     typedef RiscvTLBParams Params;
@@ -102,6 +97,8 @@ class TLB : public BaseTLB
     // Checkpointing
     void serialize(CheckpointOut &cp) const override;
     void unserialize(CheckpointIn &cp) override;
+
+    void regStats() override;
 
     Addr translateWithTLB(Addr vaddr, uint16_t asid, Mode mode);
 

@@ -35,7 +35,7 @@
 class RiscvLinux : public Linux
 {
   public:
-    static const ByteOrder byteOrder = ByteOrder::little;
+    static const ByteOrder byteOrder = LittleEndianByteOrder;
 };
 
 class RiscvLinux64 : public RiscvLinux

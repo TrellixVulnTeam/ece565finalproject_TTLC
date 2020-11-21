@@ -29,19 +29,33 @@
 #ifndef __ARCH_SPARC_STACKTRACE_HH__
 #define __ARCH_SPARC_STACKTRACE_HH__
 
-#include "cpu/profile.hh"
+#include <vector>
 
+#include "base/types.hh"
+#include "cpu/static_inst.hh"
+#include "debug/Stack.hh"
+
+class ThreadContext;
 namespace SparcISA
 {
 
-class StackTrace : public BaseStackTrace
+class StackTrace
 {
-  protected:
-    void
-    trace(ThreadContext *tc, bool is_call) override
+  private:
+    std::vector<Addr> stack;
+
+  public:
+    bool
+    trace(ThreadContext *tc, const StaticInstPtr &inst)
     {
-        panic("StackTrace::trace not implemented for SPARC.");
+        panic("StackTrace::trace not implemented for SPARC.\n");
+        return false;
     }
+
+    const std::vector<Addr> &getstack() const { return stack; }
+
+  public:
+    void dprintf() {}
 };
 
 }

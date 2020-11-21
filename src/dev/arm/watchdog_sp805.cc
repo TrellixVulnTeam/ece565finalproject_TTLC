@@ -49,6 +49,7 @@ Sp805::Sp805(Sp805Params const* params)
       persistedValue(timeoutInterval),
       enabled(false),
       resetEnabled(false),
+      intRaised(false),
       writeAccessEnabled(true),
       integrationTestEnabled(false),
       timeoutEvent([this] { timeoutExpired(); }, name())
@@ -77,10 +78,10 @@ Sp805::read(PacketPtr pkt)
         warn("Sp805::read: WO reg (0x%x) [WDOGINTCLR]\n", addr);
         break;
       case WDOGRIS:
-        resp = interrupt->active();
+        resp = intRaised;
         break;
       case WDOGMIS:
-        resp = interrupt->active() && enabled;
+        resp = intRaised & enabled;
         break;
       case WDOGLOCK:
         resp = writeAccessEnabled;
@@ -93,7 +94,7 @@ Sp805::read(PacketPtr pkt)
         break;
       default:
         if (readId(pkt, ambaId, pioAddr))
-            resp = pkt->getUintX(ByteOrder::little);
+            resp = pkt->getUintX(LittleEndianByteOrder);
         else
             warn("Sp805::read: Unexpected address (0x%x:%i), assuming RAZ\n",
                  addr, size);
@@ -101,7 +102,7 @@ Sp805::read(PacketPtr pkt)
 
     DPRINTF(Sp805, "Sp805::read: 0x%x<-0x%x(%i)\n", resp, addr, size);
 
-    pkt->setUintX(resp, ByteOrder::little);
+    pkt->setUintX(resp, LittleEndianByteOrder);
     pkt->makeResponse();
     return pioDelay;
 }
@@ -113,7 +114,7 @@ Sp805::write(PacketPtr pkt)
     const size_t size = pkt->getSize();
     panic_if(size != 4, "Sp805::write: Invalid size %i\n", size);
 
-    uint64_t data = pkt->getUintX(ByteOrder::little);
+    uint64_t data = pkt->getUintX(LittleEndianByteOrder);
     switch (addr) {
       case WDOGLOAD:
         if (writeAccessEnabled) {
@@ -209,18 +210,20 @@ Sp805::sendInt()
 {
     // If the previously sent interrupt has not been served,
     // assert system reset if enabled
-    if (interrupt->active() && enabled) {
+    if (intRaised & enabled) {
         if (resetEnabled)
             warn("Watchdog timed out, system reset asserted\n");
     } else {
-        interrupt->raise();
+        intRaised = true;
+        gic->sendInt(intNum);
     }
 }
 
 void
 Sp805::clearInt()
 {
-    interrupt->clear();
+    intRaised = false;
+    gic->clearInt(intNum);
 }
 
 void
@@ -231,6 +234,7 @@ Sp805::serialize(CheckpointOut &cp) const
     SERIALIZE_SCALAR(persistedValue);
     SERIALIZE_SCALAR(enabled);
     SERIALIZE_SCALAR(resetEnabled);
+    SERIALIZE_SCALAR(intRaised);
     SERIALIZE_SCALAR(writeAccessEnabled);
     SERIALIZE_SCALAR(integrationTestEnabled);
 
@@ -248,6 +252,7 @@ Sp805::unserialize(CheckpointIn &cp)
     UNSERIALIZE_SCALAR(persistedValue);
     UNSERIALIZE_SCALAR(enabled);
     UNSERIALIZE_SCALAR(resetEnabled);
+    UNSERIALIZE_SCALAR(intRaised);
     UNSERIALIZE_SCALAR(writeAccessEnabled);
     UNSERIALIZE_SCALAR(integrationTestEnabled);
 

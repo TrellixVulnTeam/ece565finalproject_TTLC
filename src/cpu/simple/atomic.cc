@@ -1,6 +1,6 @@
 /*
  * Copyright 2014 Google, Inc.
- * Copyright (c) 2012-2013,2015,2017-2020 ARM Limited
+ * Copyright (c) 2012-2013,2015,2017-2019 ARM Limited
  * All rights reserved.
  *
  * The license below extends only to copyright in the software and shall
@@ -125,8 +125,8 @@ AtomicSimpleCPU::drain()
 void
 AtomicSimpleCPU::threadSnoop(PacketPtr pkt, ThreadID sender)
 {
-    DPRINTF(SimpleCPU, "%s received snoop pkt for addr:%#x %s\n",
-            __func__, pkt->getAddr(), pkt->cmdString());
+    DPRINTF(SimpleCPU, "received snoop pkt for addr:%#x %s\n", pkt->getAddr(),
+            pkt->cmdString());
 
     for (ThreadID tid = 0; tid < numThreads; tid++) {
         if (tid != sender) {
@@ -272,7 +272,7 @@ AtomicSimpleCPU::suspendContext(ThreadID thread_num)
 }
 
 Tick
-AtomicSimpleCPU::sendPacket(RequestPort &port, const PacketPtr &pkt)
+AtomicSimpleCPU::sendPacket(MasterPort &port, const PacketPtr &pkt)
 {
     return port.sendAtomic(pkt);
 }
@@ -280,8 +280,8 @@ AtomicSimpleCPU::sendPacket(RequestPort &port, const PacketPtr &pkt)
 Tick
 AtomicSimpleCPU::AtomicCPUDPort::recvAtomicSnoop(PacketPtr pkt)
 {
-    DPRINTF(SimpleCPU, "%s received atomic snoop pkt for addr:%#x %s\n",
-            __func__, pkt->getAddr(), pkt->cmdString());
+    DPRINTF(SimpleCPU, "received snoop pkt for addr:%#x %s\n", pkt->getAddr(),
+            pkt->cmdString());
 
     // X86 ISA: Snooping an invalidation for monitor/mwait
     AtomicSimpleCPU *cpu = (AtomicSimpleCPU *)(&owner);
@@ -310,8 +310,8 @@ AtomicSimpleCPU::AtomicCPUDPort::recvAtomicSnoop(PacketPtr pkt)
 void
 AtomicSimpleCPU::AtomicCPUDPort::recvFunctionalSnoop(PacketPtr pkt)
 {
-    DPRINTF(SimpleCPU, "%s received functional snoop pkt for addr:%#x %s\n",
-            __func__, pkt->getAddr(), pkt->cmdString());
+    DPRINTF(SimpleCPU, "received snoop pkt for addr:%#x %s\n", pkt->getAddr(),
+            pkt->cmdString());
 
     // X86 ISA: Snooping an invalidation for monitor/mwait
     AtomicSimpleCPU *cpu = (AtomicSimpleCPU *)(&owner);
@@ -345,15 +345,21 @@ AtomicSimpleCPU::genMemFragmentRequest(const RequestPtr& req, Addr frag_addr,
         (Addr) size_left);
     size_left -= frag_size;
 
-    // Set up byte-enable mask for the current fragment
-    auto it_start = byte_enable.begin() + (size - (frag_size + size_left));
-    auto it_end = byte_enable.begin() + (size - size_left);
-    if (isAnyActiveElement(it_start, it_end)) {
-        req->setVirt(frag_addr, frag_size, flags, dataRequestorId(),
-                     inst_addr);
-        req->setByteEnable(std::vector<bool>(it_start, it_end));
+    if (!byte_enable.empty()) {
+        // Set up byte-enable mask for the current fragment
+        auto it_start = byte_enable.begin() + (size - (frag_size + size_left));
+        auto it_end = byte_enable.begin() + (size - size_left);
+        if (isAnyActiveElement(it_start, it_end)) {
+            req->setVirt(frag_addr, frag_size, flags, dataMasterId(),
+                         inst_addr);
+            req->setByteEnable(std::vector<bool>(it_start, it_end));
+        } else {
+            predicate = false;
+        }
     } else {
-        predicate = false;
+        req->setVirt(frag_addr, frag_size, flags, dataMasterId(),
+                     inst_addr);
+        req->setByteEnable(std::vector<bool>());
     }
 
     return predicate;
@@ -586,7 +592,7 @@ AtomicSimpleCPU::amoMem(Addr addr, uint8_t* data, unsigned size,
     dcache_latency = 0;
 
     req->taskId(taskId());
-    req->setVirt(addr, size, flags, dataRequestorId(),
+    req->setVirt(addr, size, flags, dataMasterId(),
                  thread->pcState().instAddr(), std::move(amo_op));
 
     // translate to physical address
@@ -707,8 +713,10 @@ AtomicSimpleCPU::tick()
                 if (fault == NoFault) {
                     countInst();
                     ppCommit->notify(std::make_pair(thread, curStaticInst));
-                } else if (traceData) {
-                    traceFault();
+                }
+                else if (traceData && !DTRACE(ExecFaulting)) {
+                    delete traceData;
+                    traceData = NULL;
                 }
 
                 if (fault != NoFault &&

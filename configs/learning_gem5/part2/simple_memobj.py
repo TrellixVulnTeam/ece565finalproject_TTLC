@@ -74,15 +74,12 @@ system.cpu.interrupts[0].int_master = system.membus.slave
 system.cpu.interrupts[0].int_slave = system.membus.master
 
 # Create a DDR3 memory controller and connect it to the membus
-system.mem_ctrl = MemCtrl()
-system.mem_ctrl.dram = DDR3_1600_8x8()
-system.mem_ctrl.dram.range = system.mem_ranges[0]
+system.mem_ctrl = DDR3_1600_8x8()
+system.mem_ctrl.range = system.mem_ranges[0]
 system.mem_ctrl.port = system.membus.master
 
 # Connect the system up to the membus
 system.system_port = system.membus.slave
-
-system.workload = SEWorkload()
 
 # Create a process for a simple "Hello World" application
 process = Process()

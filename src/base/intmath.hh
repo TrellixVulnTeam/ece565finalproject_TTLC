@@ -36,9 +36,6 @@
 #include "base/logging.hh"
 #include "base/types.hh"
 
-/**
- * @ingroup api_base_utils
- */
 inline uint64_t
 power(uint32_t n, uint32_t e)
 {
@@ -55,9 +52,6 @@ power(uint32_t n, uint32_t e)
     return result;
 }
 
-/**
- * @ingroup api_base_utils
- */
 template <class T>
 inline typename std::enable_if<std::is_integral<T>::value, int>::type
 floorLog2(T x)
@@ -80,9 +74,6 @@ floorLog2(T x)
     return y;
 }
 
-/**
- * @ingroup api_base_utils
- */
 template <class T>
 inline int
 ceilLog2(const T& n)
@@ -94,9 +85,6 @@ ceilLog2(const T& n)
     return floorLog2(n - (T)1) + 1;
 }
 
-/**
- * @ingroup api_base_utils
- */
 template <class T>
 inline bool
 isPowerOf2(const T& n)
@@ -106,9 +94,6 @@ isPowerOf2(const T& n)
     return n && !(n & (n - 1));
 }
 
-/**
- * @ingroup api_base_utils
- */
 template <class T, class U>
 inline T
 divCeil(const T& a, const U& b)
@@ -123,9 +108,7 @@ divCeil(const T& a, const U& b)
  * @param align is the alignment. Can only be a power of 2.
  * @return The aligned address. The smallest number divisible
  * by @param align which is greater than or equal to @param val.
- *
- * @ingroup api_base_utils
- */
+*/
 template <class T, class U>
 inline T
 roundUp(const T& val, const U& align)
@@ -142,9 +125,7 @@ roundUp(const T& val, const U& align)
  * @param align is the alignment. Can only be a power of 2.
  * @return The aligned address. The biggest number divisible
  * by @param align which is less than or equal to @param val.
- *
- * @ingroup api_base_utils
- */
+*/
 template <class T, class U>
 inline T
 roundDown(const T& val, const U& align)

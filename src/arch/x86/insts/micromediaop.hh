@@ -104,7 +104,7 @@ namespace X86ISA
         {}
 
         std::string generateDisassembly(Addr pc,
-            const Loader::SymbolTable *symtab) const override;
+            const Loader::SymbolTable *symtab) const;
     };
 
     class MediaOpImm : public MediaOpBase
@@ -125,7 +125,7 @@ namespace X86ISA
         {}
 
         std::string generateDisassembly(Addr pc,
-            const Loader::SymbolTable *symtab) const override;
+            const Loader::SymbolTable *symtab) const;
     };
 }
 

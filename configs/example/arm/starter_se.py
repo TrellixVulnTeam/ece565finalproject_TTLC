@@ -171,8 +171,6 @@ def create(args):
               (len(processes), args.num_cores))
         sys.exit(1)
 
-    system.workload = SEWorkload()
-
     # Assign one workload to each CPU
     for cpu, workload in zip(system.cpu_cluster.cpus, processes):
         cpu.workload = workload

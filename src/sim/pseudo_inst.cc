@@ -55,11 +55,13 @@
 #include "base/output.hh"
 #include "config/the_isa.hh"
 #include "cpu/base.hh"
+#include "cpu/quiesce_event.hh"
 #include "cpu/thread_context.hh"
 #include "debug/Loader.hh"
 #include "debug/Quiesce.hh"
 #include "debug/WorkItems.hh"
 #include "dev/net/dist_iface.hh"
+#include "kern/kernel_stats.hh"
 #include "params/BaseCPU.hh"
 #include "sim/full_system.hh"
 #include "sim/process.hh"
@@ -69,6 +71,7 @@
 #include "sim/stat_control.hh"
 #include "sim/stats.hh"
 #include "sim/system.hh"
+#include "sim/vptr.hh"
 
 using namespace std;
 using namespace Stats;
@@ -113,9 +116,8 @@ arm(ThreadContext *tc)
     if (!FullSystem)
         panicFsOnlyPseudoInst("arm");
 
-    auto *workload = tc->getSystemPtr()->workload;
-    if (workload)
-        workload->recordArm();
+    if (tc->getKernelStats())
+        tc->getKernelStats()->arm();
 }
 
 void
@@ -168,13 +170,13 @@ wakeCPU(ThreadContext *tc, uint64_t cpuid)
     DPRINTF(PseudoInst, "PseudoInst::wakeCPU(%i)\n", cpuid);
     System *sys = tc->getSystemPtr();
 
-    if (sys->threads.size() <= cpuid) {
+    if (sys->numContexts() <= cpuid) {
         warn("PseudoInst::wakeCPU(%i), cpuid greater than number of contexts"
-             "(%i)\n", cpuid, sys->threads.size());
+             "(%i)\n",cpuid, sys->numContexts());
         return;
     }
 
-    ThreadContext *other_tc = sys->threads[cpuid];
+    ThreadContext *other_tc = sys->threadContexts[cpuid];
     if (other_tc->status() == ThreadContext::Suspended)
         other_tc->activate();
 }
@@ -187,16 +189,6 @@ m5exit(ThreadContext *tc, Tick delay)
         Tick when = curTick() + delay * SimClock::Int::ns;
         exitSimLoop("m5_exit instruction encountered", 0, when, 0, true);
     }
-}
-
-// m5sum is for sanity checking the gem5 op interface.
-uint64_t
-m5sum(ThreadContext *tc, uint64_t a, uint64_t b, uint64_t c,
-                         uint64_t d, uint64_t e, uint64_t f)
-{
-    DPRINTF(PseudoInst, "PseudoInst::m5sum(%#x, %#x, %#x, %#x, %#x, %#x)\n",
-            a, b, c, d, e, f);
-    return a + b + c + d + e + f;
 }
 
 void
@@ -250,10 +242,8 @@ loadsymbol(ThreadContext *tc)
         if (!to_number(address, addr))
             continue;
 
-        if (!tc->getSystemPtr()->workload->insertSymbol(
-                    { Loader::Symbol::Binding::Global, symbol, addr })) {
+        if (!tc->getSystemPtr()->workload->insertSymbol(addr, symbol))
             continue;
-        }
 
 
         DPRINTF(Loader, "Loaded symbol: %s @ %#llx\n", symbol, addr);
@@ -274,10 +264,8 @@ addsymbol(ThreadContext *tc, Addr addr, Addr symbolAddr)
 
     DPRINTF(Loader, "Loaded symbol: %s @ %#llx\n", symbol, addr);
 
-    tc->getSystemPtr()->workload->insertSymbol(
-            { Loader::Symbol::Binding::Global, symbol, addr });
-    Loader::debugSymbolTable.insert(
-            { Loader::Symbol::Binding::Global, symbol, addr });
+    tc->getSystemPtr()->workload->insertSymbol(addr, symbol);
+    Loader::debugSymbolTable->insert(addr, symbol);
 }
 
 uint64_t
@@ -479,7 +467,8 @@ void
 m5Syscall(ThreadContext *tc)
 {
     DPRINTF(PseudoInst, "PseudoInst::m5Syscall()\n");
-    tc->getSystemPtr()->workload->syscall(tc);
+    Fault fault;
+    tc->syscall(&fault);
 }
 
 void

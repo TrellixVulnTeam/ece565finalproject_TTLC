@@ -77,12 +77,12 @@ SMMUTranslRequest::prefetch(Addr addr, uint32_t sid, uint32_t ssid)
 }
 
 SMMUTranslationProcess::SMMUTranslationProcess(const std::string &name,
-    SMMUv3 &_smmu, SMMUv3DeviceInterface &_ifc)
+    SMMUv3 &_smmu, SMMUv3SlaveInterface &_ifc)
   :
     SMMUProcess(name, _smmu),
     ifc(_ifc)
 {
-    // Decrease number of pending translation slots on the device interface
+    // Decrease number of pending translation slots on the slave interface
     assert(ifc.xlateSlotsRemaining > 0);
     ifc.xlateSlotsRemaining--;
 
@@ -92,12 +92,12 @@ SMMUTranslationProcess::SMMUTranslationProcess(const std::string &name,
 
 SMMUTranslationProcess::~SMMUTranslationProcess()
 {
-    // Increase number of pending translation slots on the device interface
+    // Increase number of pending translation slots on the slave interface
     assert(ifc.pendingMemAccesses > 0);
     ifc.pendingMemAccesses--;
 
     // If no more SMMU memory accesses are pending,
-    // signal SMMU Device Interface as drained
+    // signal SMMU Slave Interface as drained
     if (ifc.pendingMemAccesses == 0) {
         ifc.signalDrainDone();
     }
@@ -147,12 +147,12 @@ SMMUTranslationProcess::main(Yield &yield)
                 request.addr, request.size);
 
 
-    unsigned numResponderBeats = request.isWrite ?
+    unsigned numSlaveBeats = request.isWrite ?
         (request.size + (ifc.portWidth - 1)) / ifc.portWidth : 1;
 
-    doSemaphoreDown(yield, ifc.devicePortSem);
-    doDelay(yield, Cycles(numResponderBeats));
-    doSemaphoreUp(ifc.devicePortSem);
+    doSemaphoreDown(yield, ifc.slavePortSem);
+    doDelay(yield, Cycles(numSlaveBeats));
+    doSemaphoreUp(ifc.slavePortSem);
 
 
     recvTick = curTick();
@@ -261,7 +261,7 @@ SMMUTranslationProcess::smmuTranslation(Yield &yield)
 
     bool haveConfig = true;
     if (!configCacheLookup(yield, context)) {
-        if (findConfig(yield, context, tr)) {
+        if(findConfig(yield, context, tr)) {
             configCacheUpdate(yield, context);
         } else {
             haveConfig = false;
@@ -295,7 +295,7 @@ SMMUTranslationProcess::smmuTranslation(Yield &yield)
             smmuTLBUpdate(yield, tr);
     }
 
-    // Simulate pipelined SMMU->RESPONSE INTERFACE link
+    // Simulate pipelined SMMU->SLAVE INTERFACE link
     doSemaphoreDown(yield, smmu.smmuIfcSem);
     doDelay(yield, Cycles(1)); // serialize transactions
     doSemaphoreUp(smmu.smmuIfcSem);
@@ -353,14 +353,14 @@ SMMUTranslationProcess::ifcTLBLookup(Yield &yield, TranslResult &tr,
 
     if (!e) {
         DPRINTF(SMMUv3,
-                "RESPONSE Interface TLB miss vaddr=%#x sid=%#x ssid=%#x\n",
+                "SLAVE Interface TLB miss vaddr=%#x sid=%#x ssid=%#x\n",
                 request.addr, request.sid, request.ssid);
 
         return false;
     }
 
     DPRINTF(SMMUv3,
-            "RESPONSE Interface TLB hit vaddr=%#x amask=%#x sid=%#x ssid=%#x "
+            "SLAVE Interface TLB hit vaddr=%#x amask=%#x sid=%#x ssid=%#x "
             "paddr=%#x\n", request.addr, e->vaMask, request.sid,
             request.ssid, e->pa);
 
@@ -465,7 +465,7 @@ SMMUTranslationProcess::ifcTLBUpdate(Yield &yield,
     doSemaphoreDown(yield, ifc.mainTLBSem);
 
     DPRINTF(SMMUv3,
-            "RESPONSE Interface upd vaddr=%#x amask=%#x paddr=%#x sid=%#x "
+            "SLAVE Interface upd vaddr=%#x amask=%#x paddr=%#x sid=%#x "
             "ssid=%#x\n", e.va, e.vaMask, e.pa, e.sid, e.ssid);
 
     ifc.mainTLB->store(e, alloc);
@@ -1226,14 +1226,14 @@ SMMUTranslationProcess::completeTransaction(Yield &yield,
 {
     assert(tr.fault == FAULT_NONE);
 
-    unsigned numRequestorBeats = request.isWrite ?
-        (request.size + (smmu.requestPortWidth-1))
-            / smmu.requestPortWidth :
+    unsigned numMasterBeats = request.isWrite ?
+        (request.size + (smmu.masterPortWidth-1))
+            / smmu.masterPortWidth :
         1;
 
-    doSemaphoreDown(yield, smmu.requestPortSem);
-    doDelay(yield, Cycles(numRequestorBeats));
-    doSemaphoreUp(smmu.requestPortSem);
+    doSemaphoreDown(yield, smmu.masterPortSem);
+    doDelay(yield, Cycles(numMasterBeats));
+    doSemaphoreUp(smmu.masterPortSem);
 
 
     smmu.translationTimeDist.sample(curTick() - recvTick);
@@ -1242,7 +1242,7 @@ SMMUTranslationProcess::completeTransaction(Yield &yield,
         ifc.wrBufSlotsRemaining +=
             (request.size + (ifc.portWidth-1)) / ifc.portWidth;
 
-    smmu.scheduleDeviceRetries();
+    smmu.scheduleSlaveRetries();
 
 
     SMMUAction a;
@@ -1398,7 +1398,7 @@ SMMUTranslationProcess::doReadCD(Yield &yield,
                                  const StreamTableEntry &ste,
                                  uint32_t sid, uint32_t ssid)
 {
-    Addr cd_addr = 0;
+    Addr cd_addr;
 
     if (ste.dw0.s1cdmax == 0) {
         cd_addr = ste.dw0.s1ctxptr << ST_CD_ADDR_SHIFT;

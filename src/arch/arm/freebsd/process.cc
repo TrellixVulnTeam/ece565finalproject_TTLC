@@ -175,15 +175,15 @@ ArmFreebsdProcess64::initState()
 }
 
 void
-ArmFreebsdProcess32::syscall(ThreadContext *tc)
+ArmFreebsdProcess32::syscall(ThreadContext *tc, Fault *fault)
 {
-    ArmProcess32::syscall(tc);
-    syscallDescs32.get(tc->readIntReg(INTREG_R7))->doSyscall(tc);
+    ArmProcess32::syscall(tc, fault);
+    syscallDescs32.get(tc->readIntReg(INTREG_R7))->doSyscall(tc, fault);
 }
 
 void
-ArmFreebsdProcess64::syscall(ThreadContext *tc)
+ArmFreebsdProcess64::syscall(ThreadContext *tc, Fault *fault)
 {
-    ArmProcess64::syscall(tc);
-    syscallDescs64.get(tc->readIntReg(INTREG_X8))->doSyscall(tc);
+    ArmProcess64::syscall(tc, fault);
+    syscallDescs64.get(tc->readIntReg(INTREG_X8))->doSyscall(tc, fault);
 }

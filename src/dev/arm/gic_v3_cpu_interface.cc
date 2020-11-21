@@ -47,8 +47,6 @@
 #include "dev/arm/gic_v3_distributor.hh"
 #include "dev/arm/gic_v3_redistributor.hh"
 
-using namespace ArmISA;
-
 const uint8_t Gicv3CPUInterface::GIC_MIN_BPR;
 const uint8_t Gicv3CPUInterface::GIC_MIN_BPR_NS;
 
@@ -81,8 +79,6 @@ void
 Gicv3CPUInterface::setThreadContext(ThreadContext *tc)
 {
     maintenanceInterrupt = gic->params()->maint_int->get(tc);
-    fatal_if(maintenanceInterrupt->num() >= redistributor->irqPending.size(),
-        "Invalid maintenance interrupt number\n");
 }
 
 bool
@@ -1780,7 +1776,7 @@ Gicv3CPUInterface::generateSGI(RegVal val, Gicv3::GroupId group)
 
     bool ns = !inSecureState();
 
-    for (int i = 0; i < gic->getSystem()->threads.size(); i++) {
+    for (int i = 0; i < gic->getSystem()->numContexts(); i++) {
         Gicv3Redistributor * redistributor_i =
             gic->getRedistributor(i);
         uint32_t affinity_i = redistributor_i->getAffinity();
@@ -2041,22 +2037,22 @@ Gicv3CPUInterface::update()
     }
 
     if (hppiCanPreempt()) {
-        InterruptTypes int_type = intSignalType(hppi.group);
+        ArmISA::InterruptTypes int_type = intSignalType(hppi.group);
         DPRINTF(GIC, "Gicv3CPUInterface::update(): "
                 "posting int as %d!\n", int_type);
-        int_type == INT_IRQ ? signal_IRQ = true : signal_FIQ = true;
+        int_type == ArmISA::INT_IRQ ? signal_IRQ = true : signal_FIQ = true;
     }
 
     if (signal_IRQ) {
-        gic->postInt(cpuId, INT_IRQ);
+        gic->postInt(cpuId, ArmISA::INT_IRQ);
     } else {
-        gic->deassertInt(cpuId, INT_IRQ);
+        gic->deassertInt(cpuId, ArmISA::INT_IRQ);
     }
 
     if (signal_FIQ) {
-        gic->postInt(cpuId, INT_FIQ);
+        gic->postInt(cpuId, ArmISA::INT_FIQ);
     } else {
-        gic->deassertInt(cpuId, INT_FIQ);
+        gic->deassertInt(cpuId, ArmISA::INT_FIQ);
     }
 }
 
@@ -2082,29 +2078,26 @@ Gicv3CPUInterface::virtualUpdate()
 
     ICH_HCR_EL2 ich_hcr_el2 = isa->readMiscRegNoEffect(MISCREG_ICH_HCR_EL2);
 
-    const bool maint_pending = redistributor->irqPending[
-        maintenanceInterrupt->num()];
-
-    if (ich_hcr_el2.En && !maint_pending && maintenanceInterruptStatus()) {
-        maintenanceInterrupt->raise();
-    } else if (maint_pending) {
-        maintenanceInterrupt->clear();
+    if (ich_hcr_el2.En) {
+        if (maintenanceInterruptStatus()) {
+            maintenanceInterrupt->raise();
+        }
     }
 
     if (signal_IRQ) {
         DPRINTF(GIC, "Gicv3CPUInterface::virtualUpdate(): "
-                "posting int as %d!\n", INT_VIRT_IRQ);
-        gic->postInt(cpuId, INT_VIRT_IRQ);
+                "posting int as %d!\n", ArmISA::INT_VIRT_IRQ);
+        gic->postInt(cpuId, ArmISA::INT_VIRT_IRQ);
     } else {
-        gic->deassertInt(cpuId, INT_VIRT_IRQ);
+        gic->deassertInt(cpuId, ArmISA::INT_VIRT_IRQ);
     }
 
     if (signal_FIQ) {
         DPRINTF(GIC, "Gicv3CPUInterface::virtualUpdate(): "
-                "posting int as %d!\n", INT_VIRT_FIQ);
-        gic->postInt(cpuId, INT_VIRT_FIQ);
+                "posting int as %d!\n", ArmISA::INT_VIRT_FIQ);
+        gic->postInt(cpuId, ArmISA::INT_VIRT_FIQ);
     } else {
-        gic->deassertInt(cpuId, INT_VIRT_FIQ);
+        gic->deassertInt(cpuId, ArmISA::INT_VIRT_FIQ);
     }
 }
 
@@ -2222,7 +2215,7 @@ Gicv3CPUInterface::virtualIncrementEOICount()
 }
 
 // spec section 4.6.2
-InterruptTypes
+ArmISA::InterruptTypes
 Gicv3CPUInterface::intSignalType(Gicv3::GroupId group) const
 {
     bool is_fiq = false;
@@ -2246,9 +2239,9 @@ Gicv3CPUInterface::intSignalType(Gicv3::GroupId group) const
     }
 
     if (is_fiq) {
-        return INT_FIQ;
+        return ArmISA::INT_FIQ;
     } else {
-        return INT_IRQ;
+        return ArmISA::INT_IRQ;
     }
 }
 
@@ -2336,7 +2329,7 @@ Gicv3CPUInterface::inSecureState() const
 
     CPSR cpsr = isa->readMiscRegNoEffect(MISCREG_CPSR);
     SCR scr = isa->readMiscRegNoEffect(MISCREG_SCR);
-    return ::inSecureState(scr, cpsr);
+    return ArmISA::inSecureState(scr, cpsr);
 }
 
 int
@@ -2594,7 +2587,7 @@ Gicv3CPUInterface::clearPendingInterrupts()
 void
 Gicv3CPUInterface::assertWakeRequest()
 {
-    auto *tc = gic->getSystem()->threads[cpuId];
+    ThreadContext *tc = gic->getSystem()->getThreadContext(cpuId);
     if (ArmSystem::callSetWakeRequest(tc)) {
         Reset().invoke(tc);
         tc->activate();
@@ -2604,7 +2597,7 @@ Gicv3CPUInterface::assertWakeRequest()
 void
 Gicv3CPUInterface::deassertWakeRequest()
 {
-    auto *tc = gic->getSystem()->threads[cpuId];
+    ThreadContext *tc = gic->getSystem()->getThreadContext(cpuId);
     ArmSystem::callClearWakeRequest(tc);
 }
 

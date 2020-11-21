@@ -35,11 +35,11 @@
 namespace FastModel
 {
 
-CortexA76TC::CortexA76TC(::BaseCPU *cpu, int id, System *system,
-        ::BaseTLB *dtb, ::BaseTLB *itb, ::BaseISA *isa,
+CortexA76TC::CortexA76TC(
+        ::BaseCPU *cpu, int id, System *system, ::BaseTLB *dtb, ::BaseTLB *itb,
         iris::IrisConnectionInterface *iris_if,
         const std::string &iris_path) :
-    ThreadContext(cpu, id, system, dtb, itb, isa, iris_if, iris_path)
+    ThreadContext(cpu, id, system, dtb, itb, iris_if, iris_path)
 {}
 
 bool
@@ -47,11 +47,11 @@ CortexA76TC::translateAddress(Addr &paddr, Addr vaddr)
 {
     // Determine what memory spaces are currently active.
     Iris::CanonicalMsn in_msn;
-    switch (ArmISA::currEL(this)) {
-      case ArmISA::EL3:
+    switch (currEL(this)) {
+      case EL3:
         in_msn = Iris::SecureMonitorMsn;
         break;
-      case ArmISA::EL2:
+      case EL2:
         in_msn = Iris::NsHypMsn;
         break;
       default:
@@ -59,7 +59,7 @@ CortexA76TC::translateAddress(Addr &paddr, Addr vaddr)
         break;
     }
 
-    Iris::CanonicalMsn out_msn = ArmISA::isSecure(this) ?
+    Iris::CanonicalMsn out_msn = inSecureState(this) ?
         Iris::PhysicalMemorySecureMsn : Iris::PhysicalMemoryNonSecureMsn;
 
     // Figure out what memory spaces match the canonical numbers we need.
@@ -108,7 +108,7 @@ CortexA76TC::readIntRegFlat(RegIndex idx) const
     if (idx == ArmISA::INTREG_R13_MON || idx == ArmISA::INTREG_R14_MON) {
         orig_cpsr = readMiscRegNoEffect(ArmISA::MISCREG_CPSR);
         ArmISA::CPSR new_cpsr = orig_cpsr;
-        new_cpsr.mode = ArmISA::MODE_MON;
+        new_cpsr.mode = MODE_MON;
         non_const_this->setMiscReg(ArmISA::MISCREG_CPSR, new_cpsr);
     }
 
@@ -129,7 +129,7 @@ CortexA76TC::setIntRegFlat(RegIndex idx, RegVal val)
     if (idx == ArmISA::INTREG_R13_MON || idx == ArmISA::INTREG_R14_MON) {
         orig_cpsr = readMiscRegNoEffect(ArmISA::MISCREG_CPSR);
         ArmISA::CPSR new_cpsr = orig_cpsr;
-        new_cpsr.mode = ArmISA::MODE_MON;
+        new_cpsr.mode = MODE_MON;
         setMiscReg(ArmISA::MISCREG_CPSR, new_cpsr);
     }
 
@@ -146,7 +146,7 @@ CortexA76TC::readCCRegFlat(RegIndex idx) const
     RegVal result = Iris::ThreadContext::readCCRegFlat(idx);
     switch (idx) {
       case ArmISA::CCREG_NZ:
-        result = ((ArmISA::CPSR)result).nz;
+        result = ((CPSR)result).nz;
         break;
       case ArmISA::CCREG_FP:
         result = bits(result, 31, 28);
@@ -163,14 +163,14 @@ CortexA76TC::setCCRegFlat(RegIndex idx, RegVal val)
     switch (idx) {
       case ArmISA::CCREG_NZ:
         {
-            ArmISA::CPSR cpsr = readMiscRegNoEffect(ArmISA::MISCREG_CPSR);
+            CPSR cpsr = readMiscRegNoEffect(ArmISA::MISCREG_CPSR);
             cpsr.nz = val;
             val = cpsr;
         }
         break;
       case ArmISA::CCREG_FP:
         {
-            ArmISA::FPSCR fpscr = readMiscRegNoEffect(ArmISA::MISCREG_FPSCR);
+            FPSCR fpscr = readMiscRegNoEffect(ArmISA::MISCREG_FPSCR);
             val = insertBits(fpscr, 31, 28, val);
         }
         break;
@@ -231,7 +231,7 @@ Iris::ThreadContext::IdxNameMap CortexA76TC::miscRegIdxNameMap({
         // ArmISA::MISCREG_NMRR_MAIR1_S?
         // ArmISA::MISCREG_PMXEVTYPER_PMCCFILTR?
         // ArmISA::MISCREG_SCTLR_RST?
-        { ArmISA::MISCREG_SEV_MAILBOX, "SEV_STATE" },
+        // ArmISA::MISCREG_SEV_MAILBOX?
 
         // AArch32 CP14 registers (debug/trace/ThumbEE/Jazelle control)
         // ArmISA::MISCREG_DBGDIDR?
@@ -921,10 +921,10 @@ Iris::ThreadContext::IdxNameMap CortexA76TC::flattenedIntIdxNameMap({
         { ArmISA::INTREG_R13_FIQ, "X29" },
         { ArmISA::INTREG_R14_FIQ, "X30" },
         // Skip zero, ureg0-2, and dummy regs.
-        { ArmISA::INTREG_SP0, "SP_EL0" },
-        { ArmISA::INTREG_SP1, "SP_EL1" },
-        { ArmISA::INTREG_SP2, "SP_EL2" },
-        { ArmISA::INTREG_SP3, "SP_EL3" },
+        { INTREG_SP0, "SP_EL0" },
+        { INTREG_SP1, "SP_EL1" },
+        { INTREG_SP2, "SP_EL2" },
+        { INTREG_SP3, "SP_EL3" },
 });
 
 Iris::ThreadContext::IdxNameMap CortexA76TC::ccRegIdxNameMap({

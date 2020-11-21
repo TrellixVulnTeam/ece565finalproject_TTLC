@@ -28,7 +28,6 @@
 
 #include "learning_gem5/part2/goodbye_object.hh"
 
-#include "base/trace.hh"
 #include "debug/HelloExample.hh"
 #include "sim/sim_exit.hh"
 

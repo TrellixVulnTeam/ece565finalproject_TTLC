@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2012, 2016-2018, 2020 ARM Limited
+ * Copyright (c) 2011-2012, 2016-2018 ARM Limited
  * Copyright (c) 2013 Advanced Micro Devices, Inc.
  * All rights reserved
  *
@@ -49,10 +49,13 @@
 #include "cpu/thread_context.hh"
 #include "debug/Checker.hh"
 
-namespace TheISA
-{
+class EndQuiesceEvent;
+namespace Kernel {
+    class Statistics;
+};
+namespace TheISA {
     class Decoder;
-} // namespace TheISA
+};
 
 /**
  * Derived ThreadContext class for use with the Checker.  The template
@@ -147,6 +150,12 @@ class CheckerThreadContext : public ThreadContext
 
     System *getSystemPtr() override { return actualTC->getSystemPtr(); }
 
+    ::Kernel::Statistics *
+    getKernelStats() override
+    {
+        return actualTC->getKernelStats();
+    }
+
     Process *getProcessPtr() override { return actualTC->getProcessPtr(); }
 
     void setProcessPtr(Process *p) override { actualTC->setProcessPtr(p); }
@@ -171,6 +180,13 @@ class CheckerThreadContext : public ThreadContext
         actualTC->connectMemPorts(tc);
     }
 
+    /** Executes a syscall in SE mode. */
+    void
+    syscall(Fault *fault) override
+    {
+        return actualTC->syscall(fault);
+    }
+
     Status status() const override { return actualTC->status(); }
 
     void
@@ -189,6 +205,8 @@ class CheckerThreadContext : public ThreadContext
     /// Set the status to Halted.
     void halt() override { actualTC->halt(); }
 
+    void dumpFuncProfile() override { actualTC->dumpFuncProfile(); }
+
     void
     takeOverFrom(ThreadContext *oldContext) override
     {
@@ -203,8 +221,17 @@ class CheckerThreadContext : public ThreadContext
         checkerTC->regStats(name);
     }
 
+    EndQuiesceEvent *
+    getQuiesceEvent() override
+    {
+        return actualTC->getQuiesceEvent();
+    }
+
     Tick readLastActivate() override { return actualTC->readLastActivate(); }
     Tick readLastSuspend() override { return actualTC->readLastSuspend(); }
+
+    void profileClear() override { return actualTC->profileClear(); }
+    void profileSample() override { return actualTC->profileSample(); }
 
     // @todo: Do I need this?
     void
@@ -551,26 +578,6 @@ class CheckerThreadContext : public ThreadContext
     {
         actualTC->setCCRegFlat(idx, val);
     }
-
-    // hardware transactional memory
-    void
-    htmAbortTransaction(uint64_t htm_uid, HtmFailureFaultCause cause) override
-    {
-        panic("function not implemented");
-    }
-
-    BaseHTMCheckpointPtr&
-    getHtmCheckpointPtr() override
-    {
-        panic("function not implemented");
-    }
-
-    void
-    setHtmCheckpointPtr(BaseHTMCheckpointPtr new_cpt) override
-    {
-        panic("function not implemented");
-    }
-
 };
 
 #endif // __CPU_CHECKER_EXEC_CONTEXT_HH__

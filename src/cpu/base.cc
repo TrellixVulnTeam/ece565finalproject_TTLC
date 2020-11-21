@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2012,2016-2017, 2019-2020 ARM Limited
+ * Copyright (c) 2011-2012,2016-2017, 2019 ARM Limited
  * All rights reserved
  *
  * The license below extends only to copyright in the software and shall
@@ -54,6 +54,8 @@
 #include "base/output.hh"
 #include "base/trace.hh"
 #include "cpu/checker/cpu.hh"
+#include "cpu/cpuevent.hh"
+#include "cpu/profile.hh"
 #include "cpu/thread_context.hh"
 #include "debug/Mwait.hh"
 #include "debug/SyscallVerbose.hh"
@@ -63,7 +65,6 @@
 #include "sim/clocked_object.hh"
 #include "sim/full_system.hh"
 #include "sim/process.hh"
-#include "sim/root.hh"
 #include "sim/sim_events.hh"
 #include "sim/sim_exit.hh"
 #include "sim/system.hh"
@@ -72,8 +73,6 @@
 #include "sim/stat_control.hh"
 
 using namespace std;
-
-std::unique_ptr<BaseCPU::GlobalStats> BaseCPU::globalStats;
 
 vector<BaseCPU *> BaseCPU::cpuList;
 
@@ -125,11 +124,12 @@ CPUProgressEvent::description() const
 
 BaseCPU::BaseCPU(Params *p, bool is_checker)
     : ClockedObject(p), instCnt(0), _cpuId(p->cpu_id), _socketId(p->socket_id),
-      _instRequestorId(p->system->getRequestorId(this, "inst")),
-      _dataRequestorId(p->system->getRequestorId(this, "data")),
+      _instMasterId(p->system->getMasterId(this, "inst")),
+      _dataMasterId(p->system->getMasterId(this, "data")),
       _taskId(ContextSwitchTaskId::Unknown), _pid(invldPid),
       _switchedOut(p->switched_out), _cacheLineSize(p->system->cacheLineSize()),
-      interrupts(p->interrupts), numThreads(p->numThreads), system(p->system),
+      interrupts(p->interrupts), profileEvent(NULL),
+      numThreads(p->numThreads), system(p->system),
       previousCycle(0), previousState(CPU_STATE_SLEEP),
       functionTraceStream(nullptr), currentFunctionStart(0),
       currentFunctionEnd(0), functionEntryTick(0),
@@ -170,6 +170,23 @@ BaseCPU::BaseCPU(Params *p, bool is_checker)
         }
     }
 
+    // The interrupts should always be present unless this CPU is
+    // switched in later or in case it is a checker CPU
+    if (!params()->switched_out && !is_checker) {
+        fatal_if(interrupts.size() != numThreads,
+                 "CPU %s has %i interrupt controllers, but is expecting one "
+                 "per thread (%i)\n",
+                 name(), interrupts.size(), numThreads);
+        for (ThreadID tid = 0; tid < numThreads; tid++)
+            interrupts[tid]->setCPU(this);
+    }
+
+    if (FullSystem) {
+        if (params()->profile)
+            profileEvent = new EventFunctionWrapper(
+                [this]{ processProfileEvent(); },
+                name());
+    }
     tracer = params()->tracer;
 
     if (params()->isa.size() != numThreads) {
@@ -186,17 +203,7 @@ BaseCPU::enableFunctionTrace()
 
 BaseCPU::~BaseCPU()
 {
-}
-
-void
-BaseCPU::postInterrupt(ThreadID tid, int int_num, int index)
-{
-    interrupts[tid]->post(int_num, index);
-    // Only wake up syscall emulation if it is not waiting on a futex.
-    // This is to model the fact that instructions such as ARM SEV
-    // should wake up a WFE sleep, but not a futex syscall WAIT. */
-    if (FullSystem || !system->futexMap.is_waiting(threadContexts[tid]))
-        wakeup(tid);
+    delete profileEvent;
 }
 
 void
@@ -253,7 +260,7 @@ BaseCPU::mwaitAtomic(ThreadID tid, ThreadContext *tc, BaseTLB *dtb)
     if (secondAddr > addr)
         size = secondAddr - addr;
 
-    req->setVirt(addr, size, 0x0, dataRequestorId(), tc->instAddr());
+    req->setVirt(addr, size, 0x0, dataMasterId(), tc->instAddr());
 
     // translate to physical address
     Fault fault = dtb->translateAtomic(req, tc, BaseTLB::Read);
@@ -312,6 +319,11 @@ BaseCPU::init()
 void
 BaseCPU::startup()
 {
+    if (FullSystem) {
+        if (!params()->switched_out && profileEvent)
+            schedule(profileEvent, curTick());
+    }
+
     if (params()->progress_interval) {
         new CPUProgressEvent(this, params()->progress_interval);
     }
@@ -373,12 +385,6 @@ BaseCPU::regStats()
 {
     ClockedObject::regStats();
 
-    if (!globalStats) {
-        /* We need to construct the global CPU stat structure here
-         * since it needs a pointer to the Root object. */
-        globalStats.reset(new GlobalStats(Root::root()));
-    }
-
     using namespace Stats;
 
     numCycles
@@ -426,11 +432,6 @@ BaseCPU::registerThreadContexts()
 {
     assert(system->multiThread || numThreads == 1);
 
-    fatal_if(interrupts.size() != numThreads,
-             "CPU %s has %i interrupt controllers, but is expecting one "
-             "per thread (%i)\n",
-             name(), interrupts.size(), numThreads);
-
     ThreadID size = threadContexts.size();
     for (ThreadID tid = 0; tid < size; ++tid) {
         ThreadContext *tc = threadContexts[tid];
@@ -443,9 +444,6 @@ BaseCPU::registerThreadContexts()
 
         if (!FullSystem)
             tc->getProcessPtr()->assignThreadContext(tc->contextId());
-
-        interrupts[tid]->setThreadContext(tc);
-        tc->getIsaPtr()->setThreadContext(tc);
     }
 }
 
@@ -542,6 +540,8 @@ BaseCPU::switchOut()
 {
     assert(!_switchedOut);
     _switchedOut = true;
+    if (profileEvent && profileEvent->scheduled())
+        deschedule(profileEvent);
 
     // Flush all TLBs in the CPU to avoid having stale translations if
     // it gets switched in later.
@@ -573,9 +573,9 @@ BaseCPU::takeOverFrom(BaseCPU *oldCPU)
         ThreadContext *newTC = threadContexts[i];
         ThreadContext *oldTC = oldCPU->threadContexts[i];
 
-        newTC->getIsaPtr()->setThreadContext(newTC);
-
         newTC->takeOverFrom(oldTC);
+
+        CpuEvent::replaceThreadContext(oldTC, newTC);
 
         assert(newTC->contextId() == oldTC->contextId());
         assert(newTC->threadId() == oldTC->threadId());
@@ -628,9 +628,17 @@ BaseCPU::takeOverFrom(BaseCPU *oldCPU)
 
     interrupts = oldCPU->interrupts;
     for (ThreadID tid = 0; tid < numThreads; tid++) {
-        interrupts[tid]->setThreadContext(threadContexts[tid]);
+        interrupts[tid]->setCPU(this);
     }
     oldCPU->interrupts.clear();
+
+    if (FullSystem) {
+        for (ThreadID i = 0; i < size; ++i)
+            threadContexts[i]->profileClear();
+
+        if (profileEvent)
+            schedule(profileEvent, curTick());
+    }
 
     // All CPUs have an instruction and a data port, and the new CPU's
     // ports are dangling while the old CPU has its ports connected
@@ -654,6 +662,17 @@ BaseCPU::flushTLBs()
             checker->getDTBPtr()->flushAll();
         }
     }
+}
+
+void
+BaseCPU::processProfileEvent()
+{
+    ThreadID size = threadContexts.size();
+
+    for (ThreadID i = 0; i < size; ++i)
+        threadContexts[i]->profileSample();
+
+    schedule(profileEvent, curTick() + params()->profile);
 }
 
 void
@@ -732,24 +751,21 @@ bool AddressMonitor::doMonitor(PacketPtr pkt) {
 void
 BaseCPU::traceFunctionsInternal(Addr pc)
 {
-    if (Loader::debugSymbolTable.empty())
+    if (!Loader::debugSymbolTable)
         return;
 
     // if pc enters different function, print new function symbol and
     // update saved range.  Otherwise do nothing.
     if (pc < currentFunctionStart || pc >= currentFunctionEnd) {
-        auto it = Loader::debugSymbolTable.findNearest(
-                pc, currentFunctionEnd);
-
         string sym_str;
-        if (it == Loader::debugSymbolTable.end()) {
+        bool found = Loader::debugSymbolTable->findNearestSymbol(
+                pc, sym_str, currentFunctionStart, currentFunctionEnd);
+
+        if (!found) {
             // no symbol found: use addr as label
-            sym_str = csprintf("%#x", pc);
+            sym_str = csprintf("0x%x", pc);
             currentFunctionStart = pc;
             currentFunctionEnd = pc + 1;
-        } else {
-            sym_str = it->name;
-            currentFunctionStart = it->address;
         }
 
         ccprintf(*functionTraceStream, " (%d)\n%d: %s",
@@ -762,40 +778,4 @@ bool
 BaseCPU::waitForRemoteGDB() const
 {
     return params()->wait_for_remote_gdb;
-}
-
-
-BaseCPU::GlobalStats::GlobalStats(::Stats::Group *parent)
-    : ::Stats::Group(parent),
-    simInsts(this, "sim_insts", "Number of instructions simulated"),
-    simOps(this, "sim_ops", "Number of ops (including micro ops) simulated"),
-    hostInstRate(this, "host_inst_rate",
-                 "Simulator instruction rate (inst/s)"),
-    hostOpRate(this, "host_op_rate",
-               "Simulator op (including micro ops) rate (op/s)")
-{
-    simInsts
-        .functor(BaseCPU::numSimulatedInsts)
-        .precision(0)
-        .prereq(simInsts)
-        ;
-
-    simOps
-        .functor(BaseCPU::numSimulatedOps)
-        .precision(0)
-        .prereq(simOps)
-        ;
-
-    hostInstRate
-        .precision(0)
-        .prereq(simInsts)
-        ;
-
-    hostOpRate
-        .precision(0)
-        .prereq(simOps)
-        ;
-
-    hostInstRate = simInsts / hostSeconds;
-    hostOpRate = simOps / hostSeconds;
 }

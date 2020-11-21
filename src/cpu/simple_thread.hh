@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2012, 2016-2018, 2020 ARM Limited
+ * Copyright (c) 2011-2012, 2016-2018 ARM Limited
  * Copyright (c) 2013 Advanced Micro Devices, Inc.
  * All rights reserved
  *
@@ -45,9 +45,9 @@
 #include <array>
 
 #include "arch/decoder.hh"
-#include "arch/generic/htm.hh"
 #include "arch/generic/tlb.hh"
 #include "arch/isa.hh"
+#include "arch/isa_traits.hh"
 #include "arch/registers.hh"
 #include "arch/types.hh"
 #include "base/types.hh"
@@ -59,7 +59,6 @@
 #include "debug/IntRegs.hh"
 #include "debug/VecPredRegs.hh"
 #include "debug/VecRegs.hh"
-#include "mem/htm.hh"
 #include "mem/page_table.hh"
 #include "mem/request.hh"
 #include "sim/byteswap.hh"
@@ -71,6 +70,13 @@
 
 class BaseCPU;
 class CheckerCPU;
+
+class FunctionProfile;
+class ProfileNode;
+
+namespace Kernel {
+    class Statistics;
+}
 
 /**
  * The SimpleThread object provides a combination of the ThreadState
@@ -106,9 +112,6 @@ class SimpleThread : public ThreadState, public ThreadContext
 
     TheISA::PCState _pcState;
 
-    // hardware transactional memory
-    std::unique_ptr<BaseHTMCheckpoint> _htmCheckpoint;
-
     /** Did this instruction execute or is it predicated false */
     bool predicate;
 
@@ -135,14 +138,11 @@ class SimpleThread : public ThreadState, public ThreadContext
 
     TheISA::Decoder decoder;
 
-    // hardware transactional memory
-    int64_t htmTransactionStarts;
-    int64_t htmTransactionStops;
-
     // constructor: initialize SimpleThread from given process structure
     // FS
     SimpleThread(BaseCPU *_cpu, int _thread_num, System *_system,
-                 BaseTLB *_itb, BaseTLB *_dtb, BaseISA *_isa);
+                 BaseTLB *_itb, BaseTLB *_dtb, BaseISA *_isa,
+                 bool use_kernel_stats = true);
     // SE
     SimpleThread(BaseCPU *_cpu, int _thread_num, System *_system,
                  Process *_process, BaseTLB *_itb, BaseTLB *_dtb,
@@ -152,10 +152,13 @@ class SimpleThread : public ThreadState, public ThreadContext
 
     void takeOverFrom(ThreadContext *oldContext) override;
 
+    void regStats(const std::string &name) override;
+
     void copyState(ThreadContext *oldContext);
 
     void serialize(CheckpointOut &cp) const override;
     void unserialize(CheckpointIn &cp) override;
+    void startup();
 
     /***************************************************************
      *  SimpleThread functions to provide CPU with access to various
@@ -183,6 +186,8 @@ class SimpleThread : public ThreadState, public ThreadContext
     {
         dtb->demapPage(vaddr, asn);
     }
+
+    void dumpFuncProfile() override;
 
     /*******************************************
      * ThreadContext interface functions.
@@ -228,6 +233,12 @@ class SimpleThread : public ThreadState, public ThreadContext
 
     System *getSystemPtr() override { return system; }
 
+    Kernel::Statistics *
+    getKernelStats() override
+    {
+        return ThreadState::getKernelStats();
+    }
+
     PortProxy &getPhysProxy() override { return ThreadState::getPhysProxy(); }
     PortProxy &getVirtProxy() override { return ThreadState::getVirtProxy(); }
 
@@ -252,6 +263,12 @@ class SimpleThread : public ThreadState, public ThreadContext
     /// Set the status to Halted.
     void halt() override;
 
+    EndQuiesceEvent *
+    getQuiesceEvent() override
+    {
+        return ThreadState::getQuiesceEvent();
+    }
+
     Tick
     readLastActivate() override
     {
@@ -262,6 +279,9 @@ class SimpleThread : public ThreadState, public ThreadContext
     {
         return ThreadState::readLastSuspend();
     }
+
+    void profileClear() override { ThreadState::profileClear(); }
+    void profileSample() override { ThreadState::profileSample(); }
 
     void copyArchRegs(ThreadContext *tc) override;
 
@@ -276,7 +296,7 @@ class SimpleThread : public ThreadState, public ThreadContext
         for (auto &pred_reg: vecPredRegs)
             pred_reg.reset();
         ccRegs.fill(0);
-        isa->clear();
+        isa->clear(this);
     }
 
     //
@@ -538,7 +558,7 @@ class SimpleThread : public ThreadState, public ThreadContext
     RegVal
     readMiscReg(RegIndex misc_reg) override
     {
-        return isa->readMiscReg(misc_reg);
+        return isa->readMiscReg(misc_reg, this);
     }
 
     void
@@ -550,7 +570,7 @@ class SimpleThread : public ThreadState, public ThreadContext
     void
     setMiscReg(RegIndex misc_reg, RegVal val) override
     {
-        return isa->setMiscReg(misc_reg, val);
+        return isa->setMiscReg(misc_reg, val, this);
     }
 
     RegId
@@ -583,6 +603,12 @@ class SimpleThread : public ThreadState, public ThreadContext
     readFuncExeInst() const override
     {
         return ThreadState::readFuncExeInst();
+    }
+
+    void
+    syscall(Fault *fault) override
+    {
+        process->syscall(this, fault);
     }
 
     RegVal readIntRegFlat(RegIndex idx) const override { return intRegs[idx]; }
@@ -668,13 +694,6 @@ class SimpleThread : public ThreadState, public ThreadContext
 
     RegVal readCCRegFlat(RegIndex idx) const override { return ccRegs[idx]; }
     void setCCRegFlat(RegIndex idx, RegVal val) override { ccRegs[idx] = val; }
-
-    // hardware transactional memory
-    void htmAbortTransaction(uint64_t htm_uid,
-                             HtmFailureFaultCause cause) override;
-
-    BaseHTMCheckpointPtr& getHtmCheckpointPtr() override;
-    void setHtmCheckpointPtr(BaseHTMCheckpointPtr new_cpt) override;
 };
 
 

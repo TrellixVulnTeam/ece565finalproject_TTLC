@@ -50,7 +50,6 @@ HMC.add_options(parser)
 options = parser.parse_args()
 # create the system we are going to simulate
 system = System()
-system.workload = SEWorkload()
 # use timing mode for the interaction between master-slave ports
 system.mem_mode = 'timing'
 # set the clock fequency of the system

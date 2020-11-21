@@ -433,32 +433,31 @@ class SimpleExecContext : public ExecContext {
     Fault
     readMem(Addr addr, uint8_t *data, unsigned int size,
             Request::Flags flags,
-            const std::vector<bool>& byte_enable)
+            const std::vector<bool>& byte_enable = std::vector<bool>())
         override
     {
-        assert(byte_enable.size() == size);
+        assert(byte_enable.empty() || byte_enable.size() == size);
         return cpu->readMem(addr, data, size, flags, byte_enable);
     }
 
     Fault
     initiateMemRead(Addr addr, unsigned int size,
                     Request::Flags flags,
-                    const std::vector<bool>& byte_enable)
+                    const std::vector<bool>& byte_enable = std::vector<bool>())
         override
     {
-        assert(byte_enable.size() == size);
+        assert(byte_enable.empty() || byte_enable.size() == size);
         return cpu->initiateMemRead(addr, size, flags, byte_enable);
     }
 
     Fault
     writeMem(uint8_t *data, unsigned int size, Addr addr,
              Request::Flags flags, uint64_t *res,
-             const std::vector<bool>& byte_enable)
+             const std::vector<bool>& byte_enable = std::vector<bool>())
         override
     {
-        assert(byte_enable.size() == size);
-        return cpu->writeMem(data, size, addr, flags, res,
-            byte_enable);
+        assert(byte_enable.empty() || byte_enable.size() == size);
+        return cpu->writeMem(data, size, addr, flags, res, byte_enable);
     }
 
     Fault amoMem(Addr addr, uint8_t *data, unsigned int size,
@@ -472,11 +471,6 @@ class SimpleExecContext : public ExecContext {
                          AtomicOpFunctorPtr amo_op) override
     {
         return cpu->initiateMemAMO(addr, size, flags, std::move(amo_op));
-    }
-
-    Fault initiateHtmCmd(Request::Flags flags) override
-    {
-        return cpu->initiateHtmCmd(flags);
     }
 
     /**
@@ -495,6 +489,15 @@ class SimpleExecContext : public ExecContext {
     readStCondFailures() const override
     {
         return thread->readStCondFailures();
+    }
+
+    /**
+     * Executes a syscall specified by the callnum.
+     */
+    void
+    syscall(Fault *fault) override
+    {
+        thread->syscall(fault);
     }
 
     /** Returns a pointer to the ThreadContext. */
@@ -526,31 +529,6 @@ class SimpleExecContext : public ExecContext {
     setMemAccPredicate(bool val) override
     {
         thread->setMemAccPredicate(val);
-    }
-
-    uint64_t
-    getHtmTransactionUid() const override
-    {
-        return tcBase()->getHtmCheckpointPtr()->getHtmUid();
-    }
-
-    uint64_t
-    newHtmTransactionUid() const override
-    {
-        return tcBase()->getHtmCheckpointPtr()->newHtmUid();
-    }
-
-    bool
-    inHtmTransactionalState() const override
-    {
-        return (getHtmTransactionalDepth() > 0);
-    }
-
-    uint64_t
-    getHtmTransactionalDepth() const override
-    {
-        assert(thread->htmTransactionStarts >= thread->htmTransactionStops);
-        return (thread->htmTransactionStarts - thread->htmTransactionStops);
     }
 
     /**

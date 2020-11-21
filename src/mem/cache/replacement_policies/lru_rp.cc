@@ -32,7 +32,6 @@
 #include <memory>
 
 #include "params/LRURP.hh"
-#include "sim/core.hh"
 
 LRURP::LRURP(const Params *p)
     : BaseReplacementPolicy(p)

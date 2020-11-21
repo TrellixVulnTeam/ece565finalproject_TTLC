@@ -239,13 +239,13 @@ class IdeDisk : public SimObject
     DmaState_t dmaState;
     /** Dma transaction is a read */
     bool dmaRead;
-    /** Size of chunks to DMA. */
-    Addr chunkBytes;
+    /** Size of OS pages. */
+    Addr pageBytes;
     /** PRD table base address */
     uint32_t curPrdAddr;
     /** PRD entry */
     PrdTableEntry curPrd;
-    /** Device ID (device0=0/device1=1) */
+    /** Device ID (master=0/slave=1) */
     int devID;
     /** Interrupt pending */
     bool intrPending;
@@ -283,11 +283,11 @@ class IdeDisk : public SimObject
      * @param c The IDE controller
      */
     void
-    setController(IdeController *c, Addr chunk_bytes)
+    setController(IdeController *c, Addr page_bytes)
     {
         panic_if(ctrl, "Cannot change the controller once set!\n");
         ctrl = c;
-        chunkBytes = chunk_bytes;
+        pageBytes = page_bytes;
     }
 
     // Device register read/write

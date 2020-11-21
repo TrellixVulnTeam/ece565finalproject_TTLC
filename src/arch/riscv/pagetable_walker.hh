@@ -58,11 +58,11 @@ namespace RiscvISA
     {
       protected:
         // Port for accessing memory
-        class WalkerPort : public RequestPort
+        class WalkerPort : public MasterPort
         {
           public:
             WalkerPort(const std::string &_name, Walker * _walker) :
-                  RequestPort(_name, _walker), walker(_walker)
+                  MasterPort(_name, _walker), walker(_walker)
             {}
 
           protected:
@@ -166,7 +166,7 @@ namespace RiscvISA
         // The TLB we're supposed to load.
         TLB * tlb;
         System * sys;
-        RequestorID requestorId;
+        MasterID masterId;
 
         // The number of outstanding walks that can be squashed per cycle.
         unsigned numSquashable;
@@ -202,7 +202,7 @@ namespace RiscvISA
         Walker(const Params *params) :
             ClockedObject(params), port(name() + ".port", this),
             funcState(this, NULL, NULL, true), tlb(NULL), sys(params->system),
-            requestorId(sys->getRequestorId(this)),
+            masterId(sys->getMasterId(this)),
             numSquashable(params->num_squash_per_cycle),
             startWalkWrapperEvent([this]{ startWalkWrapper(); }, name())
         {

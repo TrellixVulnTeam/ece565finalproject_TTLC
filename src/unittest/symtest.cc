@@ -60,21 +60,19 @@ main(int argc, char *argv[])
     Addr address;
 
     if (!to_number(symbol, address)) {
-        auto it = symtab.find(symbol);
-        if (it == symtab.end()) {
+        if (!symtab.findAddress(symbol, address)) {
             cout << "could not find symbol: " << symbol << endl;
             exit(1);
         }
 
-        cout << symbol << " -> " << "0x" << hex << it->address << endl;
+        cout << symbol << " -> " << "0x" << hex << address << endl;
     } else {
-        auto it = symtab.find(address);
-        if (it == symtab.end()) {
+        if (!symtab.findSymbol(address, symbol)) {
             cout << "could not find address: " << address << endl;
             exit(1);
         }
 
-        cout << "0x" << hex << address << " -> " << it->name << endl;
+        cout << "0x" << hex << address << " -> " << symbol<< endl;
     }
 
     return 0;

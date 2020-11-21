@@ -100,8 +100,7 @@ def template LRSCMacroConstructor {{
         if (RL) {
             rel_fence = new MemFenceMicro(machInst, No_OpClass);
             rel_fence->setFlag(IsFirstMicroop);
-            rel_fence->setFlag(IsReadBarrier);
-            rel_fence->setFlag(IsWriteBarrier);
+            rel_fence->setFlag(IsMemBarrier);
             rel_fence->setFlag(IsDelayedCommit);
         }
 
@@ -122,8 +121,7 @@ def template LRSCMacroConstructor {{
         if (AQ) {
             acq_fence = new MemFenceMicro(machInst, No_OpClass);
             acq_fence->setFlag(IsLastMicroop);
-            acq_fence->setFlag(IsReadBarrier);
-            acq_fence->setFlag(IsWriteBarrier);
+            acq_fence->setFlag(IsMemBarrier);
         }
 
         if (RL && AQ) {
@@ -161,8 +159,7 @@ def template AtomicMemOpMacroConstructor {{
         if (RL) {
             rel_fence = new MemFenceMicro(machInst, No_OpClass);
             rel_fence->setFlag(IsFirstMicroop);
-            rel_fence->setFlag(IsReadBarrier);
-            rel_fence->setFlag(IsWriteBarrier);
+            rel_fence->setFlag(IsMemBarrier);
             rel_fence->setFlag(IsDelayedCommit);
         }
 
@@ -183,8 +180,7 @@ def template AtomicMemOpMacroConstructor {{
         if (AQ) {
             acq_fence = new MemFenceMicro(machInst, No_OpClass);
             acq_fence->setFlag(IsLastMicroop);
-            acq_fence->setFlag(IsReadBarrier);
-            acq_fence->setFlag(IsWriteBarrier);
+            acq_fence->setFlag(IsMemBarrier);
         }
 
         if (RL && AQ) {
@@ -207,6 +203,7 @@ def template AtomicMemOpRMWConstructor {{
         %(constructor)s;
 
         // overwrite default flags
+        flags[IsMemRef] = true;
         flags[IsLoad] = false;
         flags[IsStore] = false;
         flags[IsAtomic] = true;

@@ -75,6 +75,7 @@ Addr
 T1000::pciToDma(Addr pciAddr) const
 {
     panic("Need implementation\n");
+    M5_DUMMY_RETURN
 }
 
 
@@ -82,18 +83,21 @@ Addr
 T1000::calcPciConfigAddr(int bus, int dev, int func)
 {
     panic("Need implementation\n");
+    M5_DUMMY_RETURN
 }
 
 Addr
 T1000::calcPciIOAddr(Addr addr)
 {
     panic("Need implementation\n");
+    M5_DUMMY_RETURN
 }
 
 Addr
 T1000::calcPciMemAddr(Addr addr)
 {
     panic("Need implementation\n");
+    M5_DUMMY_RETURN
 }
 
 T1000 *

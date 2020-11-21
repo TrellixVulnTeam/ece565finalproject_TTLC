@@ -89,13 +89,8 @@ class IdeController : public PciDevice
             uint32_t bmidtp;
         } bmiRegs;
 
-        /** IDE disks connected to this controller
-         * For more details about device0 and device1 see:
-         * https://en.wikipedia.org/wiki/Parallel_ATA
-         * #Multiple_devices_on_a_cable
-         *
-        */
-        IdeDisk *device0, *device1;
+        /** IDE disks connected to this controller */
+        IdeDisk *master, *slave;
 
         /** Currently selected disk */
         IdeDisk *selected;
@@ -103,10 +98,10 @@ class IdeController : public PciDevice
         bool selectBit;
 
         void
-        select(bool select_device_1)
+        select(bool selSlave)
         {
-            selectBit = select_device_1;
-            selected = selectBit ? device1 : device0;
+            selectBit = selSlave;
+            selected = selectBit ? slave : master;
         }
 
         void accessCommand(Addr offset, int size, uint8_t *data, bool read);

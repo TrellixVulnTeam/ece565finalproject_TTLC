@@ -1,4 +1,4 @@
-# Copyright (c) 2019-2020 ARM Limited
+# Copyright (c) 2019 ARM Limited
 # All rights reserved.
 #
 # The license below extends only to copyright in the software and shall
@@ -54,7 +54,6 @@ python_class_map = {
                     "CacheMemory": "RubyCache",
                     "WireBuffer": "RubyWireBuffer",
                     "Sequencer": "RubySequencer",
-                    "HTMSequencer": "RubyHTMSequencer",
                     "GPUCoalescer" : "RubyGPUCoalescer",
                     "VIPERCoalescer" : "VIPERCoalescer",
                     "DirectoryMemory": "RubyDirectoryMemory",
@@ -559,7 +558,6 @@ $c_ident::$c_ident(const Params *p)
     m_machineID.type = MachineType_${ident};
     m_machineID.num = m_version;
     m_num_controllers++;
-    p->ruby_system->registerAbstractController(this);
 
     m_in_ports = $num_in_ports;
 ''')
@@ -605,7 +603,7 @@ void
 $c_ident::initNetQueues()
 {
     MachineType machine_type = string_to_MachineType("${{self.ident}}");
-    M5_VAR_USED int base = MachineType_base_number(machine_type);
+    int base M5_VAR_USED = MachineType_base_number(machine_type);
 
 ''')
         code.indent()

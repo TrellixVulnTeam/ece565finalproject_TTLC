@@ -67,23 +67,6 @@ class TempdirFixture(Fixture):
     def setup(self, testitem):
         self.path = tempfile.mkdtemp(prefix='gem5out')
 
-    def post_test_procedure(self, testitem):
-        suiteUID = testitem.metadata.uid.suite
-        testUID = testitem.metadata.name
-        testing_result_folder = os.path.join(config.result_path,
-                                             "SuiteUID:" + suiteUID,
-                                             "TestUID:" + testUID)
-
-        # Copy the output files of the run from /tmp to testing-results
-        # We want to wipe the entire result folder for this test first. Why?
-        #   If the result folder exists (probably from the previous run), if
-        #   this run emits fewer files, there'll be files from the previous
-        #   run in this folder, which would cause confusion if one does not
-        #   check the timestamp of the file.
-        if os.path.exists(testing_result_folder):
-            shutil.rmtree(testing_result_folder)
-        shutil.copytree(self.path, testing_result_folder)
-
     def teardown(self, testitem):
         if testitem.result == Result.Passed:
             shutil.rmtree(self.path)
@@ -170,7 +153,7 @@ class SConsFixture(UniqueFixture):
         command.extend(self.targets)
         if self.options:
             command.extend(self.options)
-        log_call(log.test_log, command, time=None, stderr=sys.stderr)
+        log_call(log.test_log, command, stderr=sys.stderr)
 
 class Gem5Fixture(SConsFixture):
     def __new__(cls, isa, variant, protocol=None):
@@ -208,7 +191,7 @@ class MakeFixture(Fixture):
         targets = set(self.required_by)
         command = ['make', '-C', self.directory]
         command.extend([target.target for target in targets])
-        log_call(log.test_log, command, time=None, stderr=sys.stderr)
+        log_call(command)
 
 
 class MakeTarget(Fixture):
@@ -240,7 +223,7 @@ class MakeTarget(Fixture):
 
 class TestProgram(MakeTarget):
     def __init__(self, program, isa, os, recompile=False):
-        make_dir = joinpath(config.bin_dir, program)
+        make_dir = joinpath('test-progs', program)
         make_fixture = MakeFixture(make_dir)
         target = joinpath('bin', isa, os, program)
         super(TestProgram, self).__init__(target, make_fixture)

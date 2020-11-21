@@ -48,6 +48,7 @@
 
 #include <cstdint>
 
+#include "arch/isa_traits.hh"
 #include "arch/generic/tlb.hh"
 #include "base/statistics.hh"
 #include "base/types.hh"
@@ -93,7 +94,7 @@ class Base : public ClockedObject
         /** The program counter that generated this address. */
         Addr pc;
         /** The requestor ID that generated this address. */
-        RequestorID requestorId;
+        MasterID masterId;
         /** Validity bit for the PC of this address. */
         bool validPC;
         /** Whether this address targets the secure memory space. */
@@ -151,9 +152,9 @@ class Base : public ClockedObject
          * Gets the requestor ID that generated this address
          * @return the requestor ID that generated this address
          */
-        RequestorID getRequestorId() const
+        MasterID getMasterId() const
         {
-            return requestorId;
+            return masterId;
         }
 
         /**
@@ -206,10 +207,10 @@ class Base : public ClockedObject
                 panic("PrefetchInfo::get called with a request with no data.");
             }
             switch (endian) {
-                case ByteOrder::big:
+                case BigEndianByteOrder:
                     return betoh(*(T*)data);
 
-                case ByteOrder::little:
+                case LittleEndianByteOrder:
                     return letoh(*(T*)data);
 
                 default:
@@ -280,7 +281,7 @@ class Base : public ClockedObject
     const bool onInst;
 
     /** Request id for prefetches */
-    const RequestorID requestorId;
+    const MasterID masterId;
 
     const Addr pageBytes;
 
@@ -317,11 +318,8 @@ class Base : public ClockedObject
     Addr pageOffset(Addr a) const;
     /** Build the address of the i-th block inside the page */
     Addr pageIthBlockAddress(Addr page, uint32_t i) const;
-    struct StatGroup : public Stats::Group
-    {
-        StatGroup(Stats::Group *parent);
-        Stats::Scalar pfIssued;
-    } prefetchStats;
+
+    Stats::Scalar pfIssued;
 
     /** Total prefetches issued */
     uint64_t issuedPrefetches;
@@ -351,6 +349,10 @@ class Base : public ClockedObject
 
     virtual Tick nextPrefetchReadyTime() const = 0;
 
+    /**
+     * Register local statistics.
+     */
+    void regStats() override;
 
     /**
      * Register probe points for this object.

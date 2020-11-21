@@ -41,7 +41,8 @@
 #include "params/SerialDevice.hh"
 #include "params/SerialNullDevice.hh"
 
-SerialDevice::SerialDevice(const SerialDeviceParams *p) : SimObject(p)
+SerialDevice::SerialDevice(const SerialDeviceParams *p)
+    : SimObject(p), interfaceCallback(nullptr)
 {
 }
 
@@ -50,14 +51,14 @@ SerialDevice::~SerialDevice()
 }
 
 void
-SerialDevice::regInterfaceCallback(const std::function<void()> &callback)
+SerialDevice::regInterfaceCallback(Callback *c)
 {
     // This can happen if the user has connected multiple UARTs to the
     // same terminal. In that case, each of them tries to register
     // callbacks.
-    fatal_if(interfaceCallback,
-             "A UART has already been associated with this device.");
-    interfaceCallback = callback;
+    if (interfaceCallback)
+        fatal("A UART has already been associated with this device.\n");
+    interfaceCallback = c;
 }
 
 void
@@ -66,7 +67,7 @@ SerialDevice::notifyInterface()
     assert(dataAvailable());
     // Registering a callback is optional.
     if (interfaceCallback)
-        interfaceCallback();
+        interfaceCallback->process();
 }
 
 

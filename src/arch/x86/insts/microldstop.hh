@@ -113,7 +113,7 @@ namespace X86ISA
         }
 
         std::string generateDisassembly(
-                Addr pc, const Loader::SymbolTable *symtab) const override;
+                Addr pc, const Loader::SymbolTable *symtab) const;
     };
 
     /**
@@ -147,7 +147,7 @@ namespace X86ISA
         }
 
         std::string generateDisassembly(
-                Addr pc, const Loader::SymbolTable *symtab) const override;
+                Addr pc, const Loader::SymbolTable *symtab) const;
     };
 }
 

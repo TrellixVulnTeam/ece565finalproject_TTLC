@@ -38,7 +38,6 @@ def macroop JZ_I
 {
     # Make the defualt data size of jumps 64 bits in 64 bit mode
     .adjust_env oszIn64Override
-    .control_direct
 
     rdip t1
     limm t2, imm
@@ -49,7 +48,6 @@ def macroop JNZ_I
 {
     # Make the defualt data size of jumps 64 bits in 64 bit mode
     .adjust_env oszIn64Override
-    .control_direct
 
     rdip t1
     limm t2, imm
@@ -60,7 +58,6 @@ def macroop JB_I
 {
     # Make the default data size of jumps 64 bits in 64 bit mode
     .adjust_env oszIn64Override
-    .control_direct
 
     rdip t1
     limm t2, imm
@@ -71,7 +68,6 @@ def macroop JNB_I
 {
     # Make the default data size of jumps 64 bits in 64 bit mode
     .adjust_env oszIn64Override
-    .control_direct
 
     rdip t1
     limm t2, imm
@@ -82,7 +78,6 @@ def macroop JBE_I
 {
     # Make the default data size of jumps 64 bits in 64 bit mode
     .adjust_env oszIn64Override
-    .control_direct
 
     rdip t1
     limm t2, imm
@@ -93,7 +88,6 @@ def macroop JNBE_I
 {
     # Make the default data size of jumps 64 bits in 64 bit mode
     .adjust_env oszIn64Override
-    .control_direct
 
     rdip t1
     limm t2, imm
@@ -104,7 +98,6 @@ def macroop JS_I
 {
     # Make the default data size of jumps 64 bits in 64 bit mode
     .adjust_env oszIn64Override
-    .control_direct
 
     rdip t1
     limm t2, imm
@@ -115,7 +108,6 @@ def macroop JNS_I
 {
     # Make the default data size of jumps 64 bits in 64 bit mode
     .adjust_env oszIn64Override
-    .control_direct
 
     rdip t1
     limm t2, imm
@@ -126,7 +118,6 @@ def macroop JP_I
 {
     # Make the default data size of jumps 64 bits in 64 bit mode
     .adjust_env oszIn64Override
-    .control_direct
 
     rdip t1
     limm t2, imm
@@ -137,7 +128,6 @@ def macroop JNP_I
 {
     # Make the default data size of jumps 64 bits in 64 bit mode
     .adjust_env oszIn64Override
-    .control_direct
 
     rdip t1
     limm t2, imm
@@ -148,7 +138,6 @@ def macroop JL_I
 {
     # Make the default data size of jumps 64 bits in 64 bit mode
     .adjust_env oszIn64Override
-    .control_direct
 
     rdip t1
     limm t2, imm
@@ -159,7 +148,6 @@ def macroop JNL_I
 {
     # Make the default data size of jumps 64 bits in 64 bit mode
     .adjust_env oszIn64Override
-    .control_direct
 
     rdip t1
     limm t2, imm
@@ -170,7 +158,6 @@ def macroop JLE_I
 {
     # Make the default data size of jumps 64 bits in 64 bit mode
     .adjust_env oszIn64Override
-    .control_direct
 
     rdip t1
     limm t2, imm
@@ -181,7 +168,6 @@ def macroop JNLE_I
 {
     # Make the default data size of jumps 64 bits in 64 bit mode
     .adjust_env oszIn64Override
-    .control_direct
 
     rdip t1
     limm t2, imm
@@ -192,7 +178,6 @@ def macroop JO_I
 {
     # Make the default data size of jumps 64 bits in 64 bit mode
     .adjust_env oszIn64Override
-    .control_direct
 
     rdip t1
     limm t2, imm
@@ -203,7 +188,6 @@ def macroop JNO_I
 {
     # Make the default data size of jumps 64 bits in 64 bit mode
     .adjust_env oszIn64Override
-    .control_direct
 
     rdip t1
     limm t2, imm
@@ -212,8 +196,6 @@ def macroop JNO_I
 
 def macroop JRCX_I
 {
-    .control_direct
-
     rdip t1
     add t0, t0, rcx, flags=(EZF,), dataSize=asz
     wripi t1, imm, flags=(CEZF,)

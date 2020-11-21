@@ -261,8 +261,7 @@ cpu_list = [cpu] + [shader] + [dispatcher]
 
 system = System(cpu = cpu_list,
                 mem_ranges = [AddrRange(options.mem_size)],
-                mem_mode = 'timing',
-                workload = SEWorkload())
+                mem_mode = 'timing')
 
 # Dummy voltage domain for all our clock domains
 system.voltage_domain = VoltageDomain(voltage = options.sys_voltage)

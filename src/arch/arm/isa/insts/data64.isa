@@ -83,16 +83,16 @@ let {{
         "logic": '0'
     }
 
-    immOp2 = "M5_VAR_USED uint64_t secOp = imm;"
-    sRegOp2 = "M5_VAR_USED uint64_t secOp = " + \
+    immOp2 = "uint64_t secOp M5_VAR_USED = imm;"
+    sRegOp2 = "uint64_t secOp M5_VAR_USED = " + \
               "shiftReg64(Op264, shiftAmt, shiftType, intWidth);"
-    eRegOp2 = "M5_VAR_USED uint64_t secOp = " + \
+    eRegOp2 = "uint64_t secOp M5_VAR_USED = " + \
               "extendReg64(Op264, extendType, shiftAmt, intWidth);"
 
     def buildDataWork(mnem, code, flagType, suffix, buildCc, buildNonCc,
                       base, templateBase):
         code = '''
-        M5_VAR_USED uint64_t resTemp = 0;
+        uint64_t resTemp M5_VAR_USED = 0;
         ''' + code
         ccCode = createCcCode64(carryCode64[flagType], overflowCode64[flagType])
         Name = mnem.capitalize() + suffix
@@ -312,6 +312,14 @@ let {{
     msrMrs64EnabledCheckCode = '''
         // Check for read/write access right
         if (!can%sAArch64SysReg(flat_idx, Hcr64, Scr64, cpsr, xc->tcBase())) {
+            if (flat_idx == MISCREG_DAIF ||
+                flat_idx == MISCREG_DC_ZVA_Xt ||
+                flat_idx == MISCREG_DC_CVAC_Xt ||
+                flat_idx == MISCREG_DC_CIVAC_Xt
+                )
+                return std::make_shared<UndefinedInstruction>(
+                                    machInst, 0, EC_TRAPPED_MSR_MRS_64,
+                                    mnemonic);
             return std::make_shared<UndefinedInstruction>(machInst, false,
                                                           mnemonic);
         }
@@ -392,7 +400,7 @@ let {{
                                   "use_uops" : 0,
                                   "op_wb" : ";",
                                   "fa_code" : ";"},
-                                ['IsStore']);
+                                ['IsStore', 'IsMemRef']);
     header_output += DCStore64Declare.subst(msrDCZVAIop);
     decoder_output += DCStore64Constructor.subst(msrDCZVAIop);
     exec_output += DCStore64Execute.subst(msrDCZVAIop);
@@ -403,8 +411,8 @@ let {{
     # The DC ZVA instruction is not classified as a cache maintenance
     # instruction, and therefore we shouldn't annotate it.
     cachem_fa = '''
-        fault->annotate(ArmISA::ArmFault::CM, 1);
-        fault->annotate(ArmISA::ArmFault::OFA, faultAddr);
+        fault->annotate(ArmFault::CM, 1);
+        fault->annotate(ArmFault::OFA, faultAddr);
     '''
 
     msrdccvau_ea_code = msr_check_code
@@ -423,7 +431,7 @@ let {{
                                    "use_uops" : 0,
                                    "op_wb" : ";",
                                    "fa_code" : cachem_fa},
-                                 ['IsStore']);
+                                 ['IsStore', 'IsMemRef']);
     header_output += DCStore64Declare.subst(msrDCCVAUIop);
     decoder_output += DCStore64Constructor.subst(msrDCCVAUIop);
     exec_output += DCStore64Execute.subst(msrDCCVAUIop);
@@ -447,7 +455,7 @@ let {{
                                    "use_uops" : 0,
                                    "op_wb" : ";",
                                    "fa_code" : cachem_fa},
-                                 ['IsStore']);
+                                 ['IsStore', 'IsMemRef']);
     header_output += DCStore64Declare.subst(msrDCCVACIop);
     decoder_output += DCStore64Constructor.subst(msrDCCVACIop);
     exec_output += DCStore64Execute.subst(msrDCCVACIop);
@@ -472,7 +480,7 @@ let {{
                                     "use_uops" : 0,
                                     "op_wb" : ";",
                                     "fa_code" : cachem_fa},
-                                  ['IsStore']);
+                                  ['IsStore', 'IsMemRef']);
     header_output += DCStore64Declare.subst(msrDCCIVACIop);
     decoder_output += DCStore64Constructor.subst(msrDCCIVACIop);
     exec_output += DCStore64Execute.subst(msrDCCIVACIop);
@@ -503,7 +511,7 @@ let {{
                                    "use_uops" : 0,
                                    "op_wb" : ";",
                                    "fa_code" : cachem_fa},
-                                 ['IsStore']);
+                                 ['IsStore', 'IsMemRef']);
     header_output += DCStore64Declare.subst(msrDCIVACIop);
     decoder_output += DCStore64Constructor.subst(msrDCIVACIop);
     exec_output += DCStore64Execute.subst(msrDCIVACIop);
@@ -576,9 +584,9 @@ let {{
 
     def condCompCode(flagType, op, imm):
         ccCode = createCcCode64(carryCode64[flagType], overflowCode64[flagType])
-        opDecl = "M5_VAR_USED uint64_t secOp = imm;"
+        opDecl = "uint64_t secOp M5_VAR_USED = imm;"
         if not imm:
-            opDecl = "M5_VAR_USED uint64_t secOp = Op264;"
+            opDecl = "uint64_t secOp M5_VAR_USED = Op264;"
         return opDecl + '''
             if (testPredicate(CondCodesNZ, CondCodesC, CondCodesV, condCode)) {
                 uint64_t resTemp = Op164 ''' + op + ''' secOp;

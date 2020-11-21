@@ -244,7 +244,7 @@ ArmSemihosting::portProxy(ThreadContext *tc)
     static std::unique_ptr<PortProxy> port_proxy_s;
     static System *secure_sys = nullptr;
 
-    if (ArmISA::isSecure(tc)) {
+    if (ArmISA::inSecureState(tc)) {
         System *sys = tc->getSystemPtr();
         if (sys != secure_sys) {
             if (FullSystem) {
@@ -695,6 +695,18 @@ struct SemiPseudoAbi64 : public ArmSemihosting::Abi64
 
 namespace GuestABI
 {
+
+// Ignore return values since those will be handled by semihosting.
+template <typename T>
+struct Result<SemiPseudoAbi32, T>
+{
+    static void store(ThreadContext *tc, const T &ret) {}
+};
+template <typename T>
+struct Result<SemiPseudoAbi64, T>
+{
+    static void store(ThreadContext *tc, const T &ret) {}
+};
 
 // Handle arguments the same as for semihosting operations. Skipping the first
 // slot is handled internally by the State type.

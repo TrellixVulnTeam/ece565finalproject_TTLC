@@ -534,9 +534,9 @@ processDumpQueue()
 }
 
 void
-registerResetCallback(const std::function<void()> &callback)
+registerResetCallback(Callback *cb)
 {
-    resetQueue.push_back(callback);
+    resetQueue.add(cb);
 }
 
 bool _enabled = false;
@@ -586,9 +586,9 @@ resolve(const std::string &name)
 }
 
 void
-registerDumpCallback(const std::function<void()> &callback)
+registerDumpCallback(Callback *cb)
 {
-    dumpQueue.push_back(callback);
+    dumpQueue.add(cb);
 }
 
 } // namespace Stats

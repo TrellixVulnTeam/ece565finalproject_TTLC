@@ -53,6 +53,7 @@
 #include "base/hostinfo.hh"
 #include "base/statistics.hh"
 #include "base/time.hh"
+#include "cpu/base.hh"
 #include "sim/global_event.hh"
 
 using namespace std;
@@ -61,7 +62,6 @@ Stats::Formula simSeconds;
 Stats::Value simTicks;
 Stats::Value finalTick;
 Stats::Value simFreq;
-Stats::Value hostSeconds;
 
 namespace Stats {
 
@@ -69,6 +69,15 @@ Time statTime(true);
 Tick startTick;
 
 GlobalEvent *dumpEvent;
+
+struct SimTicksReset : public Callback
+{
+    void process()
+    {
+        statTime.setTimer();
+        startTick = curTick();
+    }
+};
 
 double
 statElapsedTime()
@@ -92,16 +101,40 @@ statFinalTick()
     return curTick();
 }
 
+SimTicksReset simTicksReset;
+
 struct Global
 {
+    Stats::Formula hostInstRate;
+    Stats::Formula hostOpRate;
     Stats::Formula hostTickRate;
     Stats::Value hostMemory;
+    Stats::Value hostSeconds;
+
+    Stats::Value simInsts;
+    Stats::Value simOps;
 
     Global();
 };
 
 Global::Global()
 {
+    simInsts
+        .functor(BaseCPU::numSimulatedInsts)
+        .name("sim_insts")
+        .desc("Number of instructions simulated")
+        .precision(0)
+        .prereq(simInsts)
+        ;
+
+    simOps
+        .functor(BaseCPU::numSimulatedOps)
+        .name("sim_ops")
+        .desc("Number of ops (including micro ops) simulated")
+        .precision(0)
+        .prereq(simOps)
+        ;
+
     simSeconds
         .name("sim_seconds")
         .desc("Number of seconds simulated")
@@ -126,6 +159,20 @@ Global::Global()
               "(restored from checkpoints and never reset)")
         ;
 
+    hostInstRate
+        .name("host_inst_rate")
+        .desc("Simulator instruction rate (inst/s)")
+        .precision(0)
+        .prereq(simInsts)
+        ;
+
+    hostOpRate
+        .name("host_op_rate")
+        .desc("Simulator op (including micro ops) rate (op/s)")
+        .precision(0)
+        .prereq(simOps)
+        ;
+
     hostMemory
         .functor(memUsage)
         .name("host_mem_usage")
@@ -147,12 +194,11 @@ Global::Global()
         ;
 
     simSeconds = simTicks / simFreq;
+    hostInstRate = simInsts / hostSeconds;
+    hostOpRate = simOps / hostSeconds;
     hostTickRate = simTicks / hostSeconds;
 
-    registerResetCallback([]() {
-        statTime.setTimer();
-        startTick = curTick();
-    });
+    registerResetCallback(&simTicksReset);
 }
 
 void

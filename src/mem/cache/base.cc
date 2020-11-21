@@ -63,10 +63,10 @@
 
 using namespace std;
 
-BaseCache::CacheResponsePort::CacheResponsePort(const std::string &_name,
+BaseCache::CacheSlavePort::CacheSlavePort(const std::string &_name,
                                           BaseCache *_cache,
                                           const std::string &_label)
-    : QueuedResponsePort(_name, _cache, queue),
+    : QueuedSlavePort(_name, _cache, queue),
       queue(*_cache, *this, true, _label),
       blocked(false), mustSendRetry(false),
       sendRetryEvent([this]{ processSendRetry(); }, _name)
@@ -75,8 +75,8 @@ BaseCache::CacheResponsePort::CacheResponsePort(const std::string &_name,
 
 BaseCache::BaseCache(const BaseCacheParams *p, unsigned blk_size)
     : ClockedObject(p),
-      cpuSidePort (p->name + ".cpu_side_port", this, "CpuSidePort"),
-      memSidePort(p->name + ".mem_side_port", this, "MemSidePort"),
+      cpuSidePort (p->name + ".cpu_side", this, "CpuSidePort"),
+      memSidePort(p->name + ".mem_side", this, "MemSidePort"),
       mshrQueue("MSHRs", p->mshrs, 0, p->demand_mshr_reserve), // see below
       writeBuffer("write buffer", p->write_buffers, p->mshrs), // see below
       tags(p->tags),
@@ -114,7 +114,7 @@ BaseCache::BaseCache(const BaseCacheParams *p, unsigned blk_size)
     // buffer before committing to an MSHR
 
     // forward snoops is overridden in init() once we can query
-    // whether the connected requestor is actually snooping or not
+    // whether the connected master is actually snooping or not
 
     tempBlock = new TempCacheBlk(blkSize);
 
@@ -129,7 +129,7 @@ BaseCache::~BaseCache()
 }
 
 void
-BaseCache::CacheResponsePort::setBlocked()
+BaseCache::CacheSlavePort::setBlocked()
 {
     assert(!blocked);
     DPRINTF(CachePort, "Port is blocking new requests\n");
@@ -144,7 +144,7 @@ BaseCache::CacheResponsePort::setBlocked()
 }
 
 void
-BaseCache::CacheResponsePort::clearBlocked()
+BaseCache::CacheSlavePort::clearBlocked()
 {
     assert(blocked);
     DPRINTF(CachePort, "Port is accepting new requests\n");
@@ -156,7 +156,7 @@ BaseCache::CacheResponsePort::clearBlocked()
 }
 
 void
-BaseCache::CacheResponsePort::processSendRetry()
+BaseCache::CacheSlavePort::processSendRetry()
 {
     DPRINTF(CachePort, "Port is sending retry\n");
 
@@ -270,8 +270,8 @@ BaseCache::handleTimingReqMiss(PacketPtr pkt, MSHR *mshr, CacheBlk *blk,
                 DPRINTF(Cache, "%s coalescing MSHR for %s\n", __func__,
                         pkt->print());
 
-                assert(pkt->req->requestorId() < system->maxRequestors());
-                stats.cmdStats(pkt).mshr_hits[pkt->req->requestorId()]++;
+                assert(pkt->req->masterId() < system->maxMasters());
+                stats.cmdStats(pkt).mshr_hits[pkt->req->masterId()]++;
 
                 // We use forward_time here because it is the same
                 // considering new targets. We have multiple
@@ -294,8 +294,8 @@ BaseCache::handleTimingReqMiss(PacketPtr pkt, MSHR *mshr, CacheBlk *blk,
         }
     } else {
         // no MSHR
-        assert(pkt->req->requestorId() < system->maxRequestors());
-        stats.cmdStats(pkt).mshr_misses[pkt->req->requestorId()]++;
+        assert(pkt->req->masterId() < system->maxMasters());
+        stats.cmdStats(pkt).mshr_misses[pkt->req->masterId()]++;
 
         if (pkt->isEviction() || pkt->cmd == MemCmd::WriteClean) {
             // We use forward_time here because there is an
@@ -441,13 +441,13 @@ BaseCache::recvTimingResp(PacketPtr pkt)
     const QueueEntry::Target *initial_tgt = mshr->getTarget();
     const Tick miss_latency = curTick() - initial_tgt->recvTime;
     if (pkt->req->isUncacheable()) {
-        assert(pkt->req->requestorId() < system->maxRequestors());
+        assert(pkt->req->masterId() < system->maxMasters());
         stats.cmdStats(initial_tgt->pkt)
-            .mshr_uncacheable_lat[pkt->req->requestorId()] += miss_latency;
+            .mshr_uncacheable_lat[pkt->req->masterId()] += miss_latency;
     } else {
-        assert(pkt->req->requestorId() < system->maxRequestors());
+        assert(pkt->req->masterId() < system->maxMasters());
         stats.cmdStats(initial_tgt->pkt)
-            .mshr_miss_latency[pkt->req->requestorId()] += miss_latency;
+            .mshr_miss_latency[pkt->req->masterId()] += miss_latency;
     }
 
     PacketList writebacks;
@@ -514,7 +514,7 @@ BaseCache::recvTimingResp(PacketPtr pkt)
 
         // Request the bus for a prefetch if this deallocation freed enough
         // MSHRs for a prefetch to take place
-        if (prefetcher && mshrQueue.canPrefetch() && !isBlocked()) {
+        if (prefetcher && mshrQueue.canPrefetch()) {
             Tick next_pf_time = std::max(prefetcher->nextPrefetchReadyTime(),
                                          clockEdge());
             if (next_pf_time != MaxTick)
@@ -764,7 +764,7 @@ BaseCache::getNextQueueEntry()
 
     // fall through... no pending requests.  Try a prefetch.
     assert(!miss_mshr && !wq_entry);
-    if (prefetcher && mshrQueue.canPrefetch() && !isBlocked()) {
+    if (prefetcher && mshrQueue.canPrefetch()) {
         // If we have a miss queue slot, we can try a prefetch
         PacketPtr pkt = prefetcher->getPacket();
         if (pkt) {
@@ -774,8 +774,8 @@ BaseCache::getNextQueueEntry()
                 !writeBuffer.findMatch(pf_addr, pkt->isSecure())) {
                 // Update statistic on number of prefetches issued
                 // (hwpf_mshr_misses)
-                assert(pkt->req->requestorId() < system->maxRequestors());
-                stats.cmdStats(pkt).mshr_misses[pkt->req->requestorId()]++;
+                assert(pkt->req->masterId() < system->maxMasters());
+                stats.cmdStats(pkt).mshr_misses[pkt->req->masterId()]++;
 
                 // allocate an MSHR and return it, note
                 // that we send the packet straight away, so do not
@@ -844,18 +844,18 @@ BaseCache::updateCompressionData(CacheBlk *blk, const uint64_t* data,
 
     // The compressor is called to compress the updated data, so that its
     // metadata can be updated.
+    std::size_t compression_size = 0;
     Cycles compression_lat = Cycles(0);
     Cycles decompression_lat = Cycles(0);
-    const auto comp_data =
-        compressor->compress(data, compression_lat, decompression_lat);
-    std::size_t compression_size = comp_data->getSizeBits();
+    compressor->compress(data, compression_lat, decompression_lat,
+                         compression_size);
 
     // If block's compression factor increased, it may not be co-allocatable
     // anymore. If so, some blocks might need to be evicted to make room for
     // the bigger block
 
     // Get previous compressed size
-    M5_VAR_USED const std::size_t prev_size = compression_blk->getSizeBits();
+    const std::size_t M5_VAR_USED prev_size = compression_blk->getSizeBits();
 
     // Check if new data is co-allocatable
     const bool is_co_allocatable = superblock->isCompressed(compression_blk) &&
@@ -910,7 +910,7 @@ BaseCache::satisfyRequest(PacketPtr pkt, CacheBlk *blk, bool, bool)
     // satisfying a string of Read and ReadEx requests from
     // upper-level caches, a Read will mark the block as shared but we
     // can satisfy a following ReadEx anyway since we can rely on the
-    // Read requestor(s) to have buffered the ReadEx snoop and to
+    // Read requester(s) to have buffered the ReadEx snoop and to
     // invalidate their blocks after receiving them.
     // assert(!pkt->needsWritable() || blk->isWritable());
     assert(pkt->getOffset(blkSize) + pkt->getSize() <= blkSize);
@@ -1421,9 +1421,8 @@ BaseCache::allocateBlock(const PacketPtr pkt, PacketList &writebacks)
     // calculate the amount of extra cycles needed to read or write compressed
     // blocks.
     if (compressor && pkt->hasData()) {
-        const auto comp_data = compressor->compress(
-            pkt->getConstPtr<uint64_t>(), compression_lat, decompression_lat);
-        blk_size_bits = comp_data->getSizeBits();
+        compressor->compress(pkt->getConstPtr<uint64_t>(), compression_lat,
+                             decompression_lat, blk_size_bits);
     }
 
     // Find replacement victim
@@ -1489,10 +1488,10 @@ BaseCache::writebackBlk(CacheBlk *blk)
                   "Writeback from read-only cache");
     assert(blk && blk->isValid() && (blk->isDirty() || writebackClean));
 
-    stats.writebacks[Request::wbRequestorId]++;
+    stats.writebacks[Request::wbMasterId]++;
 
     RequestPtr req = std::make_shared<Request>(
-        regenerateBlkAddr(blk), blkSize, 0, Request::wbRequestorId);
+        regenerateBlkAddr(blk), blkSize, 0, Request::wbMasterId);
 
     if (blk->isSecure())
         req->setFlags(Request::SECURE);
@@ -1534,7 +1533,7 @@ PacketPtr
 BaseCache::writecleanBlk(CacheBlk *blk, Request::Flags dest, PacketId id)
 {
     RequestPtr req = std::make_shared<Request>(
-        regenerateBlkAddr(blk), blkSize, 0, Request::wbRequestorId);
+        regenerateBlkAddr(blk), blkSize, 0, Request::wbMasterId);
 
     if (blk->isSecure()) {
         req->setFlags(Request::SECURE);
@@ -1607,7 +1606,7 @@ BaseCache::writebackVisitor(CacheBlk &blk)
         assert(blk.isValid());
 
         RequestPtr request = std::make_shared<Request>(
-            regenerateBlkAddr(&blk), blkSize, 0, Request::funcRequestorId);
+            regenerateBlkAddr(&blk), blkSize, 0, Request::funcMasterId);
 
         request->taskId(blk.task_id);
         if (blk.isSecure()) {
@@ -1644,7 +1643,7 @@ BaseCache::nextQueueReadyTime() const
 
     // Don't signal prefetch ready time if no MSHRs available
     // Will signal once enoguh MSHRs are deallocated
-    if (prefetcher && mshrQueue.canPrefetch() && !isBlocked()) {
+    if (prefetcher && mshrQueue.canPrefetch()) {
         nextReady = std::min(nextReady,
                              prefetcher->nextPrefetchReadyTime());
     }
@@ -1869,121 +1868,121 @@ BaseCache::CacheCmdStats::regStatsFromParent()
 
     Stats::Group::regStats();
     System *system = cache.system;
-    const auto max_requestors = system->maxRequestors();
+    const auto max_masters = system->maxMasters();
 
     hits
-        .init(max_requestors)
+        .init(max_masters)
         .flags(total | nozero | nonan)
         ;
-    for (int i = 0; i < max_requestors; i++) {
-        hits.subname(i, system->getRequestorName(i));
+    for (int i = 0; i < max_masters; i++) {
+        hits.subname(i, system->getMasterName(i));
     }
 
     // Miss statistics
     misses
-        .init(max_requestors)
+        .init(max_masters)
         .flags(total | nozero | nonan)
         ;
-    for (int i = 0; i < max_requestors; i++) {
-        misses.subname(i, system->getRequestorName(i));
+    for (int i = 0; i < max_masters; i++) {
+        misses.subname(i, system->getMasterName(i));
     }
 
     // Miss latency statistics
     missLatency
-        .init(max_requestors)
+        .init(max_masters)
         .flags(total | nozero | nonan)
         ;
-    for (int i = 0; i < max_requestors; i++) {
-        missLatency.subname(i, system->getRequestorName(i));
+    for (int i = 0; i < max_masters; i++) {
+        missLatency.subname(i, system->getMasterName(i));
     }
 
     // access formulas
     accesses.flags(total | nozero | nonan);
     accesses = hits + misses;
-    for (int i = 0; i < max_requestors; i++) {
-        accesses.subname(i, system->getRequestorName(i));
+    for (int i = 0; i < max_masters; i++) {
+        accesses.subname(i, system->getMasterName(i));
     }
 
     // miss rate formulas
     missRate.flags(total | nozero | nonan);
     missRate = misses / accesses;
-    for (int i = 0; i < max_requestors; i++) {
-        missRate.subname(i, system->getRequestorName(i));
+    for (int i = 0; i < max_masters; i++) {
+        missRate.subname(i, system->getMasterName(i));
     }
 
     // miss latency formulas
     avgMissLatency.flags(total | nozero | nonan);
     avgMissLatency = missLatency / misses;
-    for (int i = 0; i < max_requestors; i++) {
-        avgMissLatency.subname(i, system->getRequestorName(i));
+    for (int i = 0; i < max_masters; i++) {
+        avgMissLatency.subname(i, system->getMasterName(i));
     }
 
     // MSHR statistics
     // MSHR hit statistics
     mshr_hits
-        .init(max_requestors)
+        .init(max_masters)
         .flags(total | nozero | nonan)
         ;
-    for (int i = 0; i < max_requestors; i++) {
-        mshr_hits.subname(i, system->getRequestorName(i));
+    for (int i = 0; i < max_masters; i++) {
+        mshr_hits.subname(i, system->getMasterName(i));
     }
 
     // MSHR miss statistics
     mshr_misses
-        .init(max_requestors)
+        .init(max_masters)
         .flags(total | nozero | nonan)
         ;
-    for (int i = 0; i < max_requestors; i++) {
-        mshr_misses.subname(i, system->getRequestorName(i));
+    for (int i = 0; i < max_masters; i++) {
+        mshr_misses.subname(i, system->getMasterName(i));
     }
 
     // MSHR miss latency statistics
     mshr_miss_latency
-        .init(max_requestors)
+        .init(max_masters)
         .flags(total | nozero | nonan)
         ;
-    for (int i = 0; i < max_requestors; i++) {
-        mshr_miss_latency.subname(i, system->getRequestorName(i));
+    for (int i = 0; i < max_masters; i++) {
+        mshr_miss_latency.subname(i, system->getMasterName(i));
     }
 
     // MSHR uncacheable statistics
     mshr_uncacheable
-        .init(max_requestors)
+        .init(max_masters)
         .flags(total | nozero | nonan)
         ;
-    for (int i = 0; i < max_requestors; i++) {
-        mshr_uncacheable.subname(i, system->getRequestorName(i));
+    for (int i = 0; i < max_masters; i++) {
+        mshr_uncacheable.subname(i, system->getMasterName(i));
     }
 
     // MSHR miss latency statistics
     mshr_uncacheable_lat
-        .init(max_requestors)
+        .init(max_masters)
         .flags(total | nozero | nonan)
         ;
-    for (int i = 0; i < max_requestors; i++) {
-        mshr_uncacheable_lat.subname(i, system->getRequestorName(i));
+    for (int i = 0; i < max_masters; i++) {
+        mshr_uncacheable_lat.subname(i, system->getMasterName(i));
     }
 
     // MSHR miss rate formulas
     mshrMissRate.flags(total | nozero | nonan);
     mshrMissRate = mshr_misses / accesses;
 
-    for (int i = 0; i < max_requestors; i++) {
-        mshrMissRate.subname(i, system->getRequestorName(i));
+    for (int i = 0; i < max_masters; i++) {
+        mshrMissRate.subname(i, system->getMasterName(i));
     }
 
     // mshrMiss latency formulas
     avgMshrMissLatency.flags(total | nozero | nonan);
     avgMshrMissLatency = mshr_miss_latency / mshr_misses;
-    for (int i = 0; i < max_requestors; i++) {
-        avgMshrMissLatency.subname(i, system->getRequestorName(i));
+    for (int i = 0; i < max_masters; i++) {
+        avgMshrMissLatency.subname(i, system->getMasterName(i));
     }
 
     // mshrUncacheable latency formulas
     avgMshrUncacheableLatency.flags(total | nozero | nonan);
     avgMshrUncacheableLatency = mshr_uncacheable_lat / mshr_uncacheable;
-    for (int i = 0; i < max_requestors; i++) {
-        avgMshrUncacheableLatency.subname(i, system->getRequestorName(i));
+    for (int i = 0; i < max_masters; i++) {
+        avgMshrUncacheableLatency.subname(i, system->getMasterName(i));
     }
 }
 
@@ -2064,7 +2063,7 @@ BaseCache::CacheStats::regStats()
     Stats::Group::regStats();
 
     System *system = cache.system;
-    const auto max_requestors = system->maxRequestors();
+    const auto max_masters = system->maxMasters();
 
     for (auto &cs : cmd)
         cs->regStatsFromParent();
@@ -2084,74 +2083,74 @@ BaseCache::CacheStats::regStats()
 
     demandHits.flags(total | nozero | nonan);
     demandHits = SUM_DEMAND(hits);
-    for (int i = 0; i < max_requestors; i++) {
-        demandHits.subname(i, system->getRequestorName(i));
+    for (int i = 0; i < max_masters; i++) {
+        demandHits.subname(i, system->getMasterName(i));
     }
 
     overallHits.flags(total | nozero | nonan);
     overallHits = demandHits + SUM_NON_DEMAND(hits);
-    for (int i = 0; i < max_requestors; i++) {
-        overallHits.subname(i, system->getRequestorName(i));
+    for (int i = 0; i < max_masters; i++) {
+        overallHits.subname(i, system->getMasterName(i));
     }
 
     demandMisses.flags(total | nozero | nonan);
     demandMisses = SUM_DEMAND(misses);
-    for (int i = 0; i < max_requestors; i++) {
-        demandMisses.subname(i, system->getRequestorName(i));
+    for (int i = 0; i < max_masters; i++) {
+        demandMisses.subname(i, system->getMasterName(i));
     }
 
     overallMisses.flags(total | nozero | nonan);
     overallMisses = demandMisses + SUM_NON_DEMAND(misses);
-    for (int i = 0; i < max_requestors; i++) {
-        overallMisses.subname(i, system->getRequestorName(i));
+    for (int i = 0; i < max_masters; i++) {
+        overallMisses.subname(i, system->getMasterName(i));
     }
 
     demandMissLatency.flags(total | nozero | nonan);
     demandMissLatency = SUM_DEMAND(missLatency);
-    for (int i = 0; i < max_requestors; i++) {
-        demandMissLatency.subname(i, system->getRequestorName(i));
+    for (int i = 0; i < max_masters; i++) {
+        demandMissLatency.subname(i, system->getMasterName(i));
     }
 
     overallMissLatency.flags(total | nozero | nonan);
     overallMissLatency = demandMissLatency + SUM_NON_DEMAND(missLatency);
-    for (int i = 0; i < max_requestors; i++) {
-        overallMissLatency.subname(i, system->getRequestorName(i));
+    for (int i = 0; i < max_masters; i++) {
+        overallMissLatency.subname(i, system->getMasterName(i));
     }
 
     demandAccesses.flags(total | nozero | nonan);
     demandAccesses = demandHits + demandMisses;
-    for (int i = 0; i < max_requestors; i++) {
-        demandAccesses.subname(i, system->getRequestorName(i));
+    for (int i = 0; i < max_masters; i++) {
+        demandAccesses.subname(i, system->getMasterName(i));
     }
 
     overallAccesses.flags(total | nozero | nonan);
     overallAccesses = overallHits + overallMisses;
-    for (int i = 0; i < max_requestors; i++) {
-        overallAccesses.subname(i, system->getRequestorName(i));
+    for (int i = 0; i < max_masters; i++) {
+        overallAccesses.subname(i, system->getMasterName(i));
     }
 
     demandMissRate.flags(total | nozero | nonan);
     demandMissRate = demandMisses / demandAccesses;
-    for (int i = 0; i < max_requestors; i++) {
-        demandMissRate.subname(i, system->getRequestorName(i));
+    for (int i = 0; i < max_masters; i++) {
+        demandMissRate.subname(i, system->getMasterName(i));
     }
 
     overallMissRate.flags(total | nozero | nonan);
     overallMissRate = overallMisses / overallAccesses;
-    for (int i = 0; i < max_requestors; i++) {
-        overallMissRate.subname(i, system->getRequestorName(i));
+    for (int i = 0; i < max_masters; i++) {
+        overallMissRate.subname(i, system->getMasterName(i));
     }
 
     demandAvgMissLatency.flags(total | nozero | nonan);
     demandAvgMissLatency = demandMissLatency / demandMisses;
-    for (int i = 0; i < max_requestors; i++) {
-        demandAvgMissLatency.subname(i, system->getRequestorName(i));
+    for (int i = 0; i < max_masters; i++) {
+        demandAvgMissLatency.subname(i, system->getMasterName(i));
     }
 
     overallAvgMissLatency.flags(total | nozero | nonan);
     overallAvgMissLatency = overallMissLatency / overallMisses;
-    for (int i = 0; i < max_requestors; i++) {
-        overallAvgMissLatency.subname(i, system->getRequestorName(i));
+    for (int i = 0; i < max_masters; i++) {
+        overallAvgMissLatency.subname(i, system->getMasterName(i));
     }
 
     blocked_cycles.init(NUM_BLOCKED_CAUSES);
@@ -2176,55 +2175,55 @@ BaseCache::CacheStats::regStats()
     unusedPrefetches.flags(nozero);
 
     writebacks
-        .init(max_requestors)
+        .init(max_masters)
         .flags(total | nozero | nonan)
         ;
-    for (int i = 0; i < max_requestors; i++) {
-        writebacks.subname(i, system->getRequestorName(i));
+    for (int i = 0; i < max_masters; i++) {
+        writebacks.subname(i, system->getMasterName(i));
     }
 
     demandMshrHits.flags(total | nozero | nonan);
     demandMshrHits = SUM_DEMAND(mshr_hits);
-    for (int i = 0; i < max_requestors; i++) {
-        demandMshrHits.subname(i, system->getRequestorName(i));
+    for (int i = 0; i < max_masters; i++) {
+        demandMshrHits.subname(i, system->getMasterName(i));
     }
 
     overallMshrHits.flags(total | nozero | nonan);
     overallMshrHits = demandMshrHits + SUM_NON_DEMAND(mshr_hits);
-    for (int i = 0; i < max_requestors; i++) {
-        overallMshrHits.subname(i, system->getRequestorName(i));
+    for (int i = 0; i < max_masters; i++) {
+        overallMshrHits.subname(i, system->getMasterName(i));
     }
 
     demandMshrMisses.flags(total | nozero | nonan);
     demandMshrMisses = SUM_DEMAND(mshr_misses);
-    for (int i = 0; i < max_requestors; i++) {
-        demandMshrMisses.subname(i, system->getRequestorName(i));
+    for (int i = 0; i < max_masters; i++) {
+        demandMshrMisses.subname(i, system->getMasterName(i));
     }
 
     overallMshrMisses.flags(total | nozero | nonan);
     overallMshrMisses = demandMshrMisses + SUM_NON_DEMAND(mshr_misses);
-    for (int i = 0; i < max_requestors; i++) {
-        overallMshrMisses.subname(i, system->getRequestorName(i));
+    for (int i = 0; i < max_masters; i++) {
+        overallMshrMisses.subname(i, system->getMasterName(i));
     }
 
     demandMshrMissLatency.flags(total | nozero | nonan);
     demandMshrMissLatency = SUM_DEMAND(mshr_miss_latency);
-    for (int i = 0; i < max_requestors; i++) {
-        demandMshrMissLatency.subname(i, system->getRequestorName(i));
+    for (int i = 0; i < max_masters; i++) {
+        demandMshrMissLatency.subname(i, system->getMasterName(i));
     }
 
     overallMshrMissLatency.flags(total | nozero | nonan);
     overallMshrMissLatency =
         demandMshrMissLatency + SUM_NON_DEMAND(mshr_miss_latency);
-    for (int i = 0; i < max_requestors; i++) {
-        overallMshrMissLatency.subname(i, system->getRequestorName(i));
+    for (int i = 0; i < max_masters; i++) {
+        overallMshrMissLatency.subname(i, system->getMasterName(i));
     }
 
     overallMshrUncacheable.flags(total | nozero | nonan);
     overallMshrUncacheable =
         SUM_DEMAND(mshr_uncacheable) + SUM_NON_DEMAND(mshr_uncacheable);
-    for (int i = 0; i < max_requestors; i++) {
-        overallMshrUncacheable.subname(i, system->getRequestorName(i));
+    for (int i = 0; i < max_masters; i++) {
+        overallMshrUncacheable.subname(i, system->getMasterName(i));
     }
 
 
@@ -2232,39 +2231,39 @@ BaseCache::CacheStats::regStats()
     overallMshrUncacheableLatency =
         SUM_DEMAND(mshr_uncacheable_lat) +
         SUM_NON_DEMAND(mshr_uncacheable_lat);
-    for (int i = 0; i < max_requestors; i++) {
-        overallMshrUncacheableLatency.subname(i, system->getRequestorName(i));
+    for (int i = 0; i < max_masters; i++) {
+        overallMshrUncacheableLatency.subname(i, system->getMasterName(i));
     }
 
     demandMshrMissRate.flags(total | nozero | nonan);
     demandMshrMissRate = demandMshrMisses / demandAccesses;
-    for (int i = 0; i < max_requestors; i++) {
-        demandMshrMissRate.subname(i, system->getRequestorName(i));
+    for (int i = 0; i < max_masters; i++) {
+        demandMshrMissRate.subname(i, system->getMasterName(i));
     }
 
     overallMshrMissRate.flags(total | nozero | nonan);
     overallMshrMissRate = overallMshrMisses / overallAccesses;
-    for (int i = 0; i < max_requestors; i++) {
-        overallMshrMissRate.subname(i, system->getRequestorName(i));
+    for (int i = 0; i < max_masters; i++) {
+        overallMshrMissRate.subname(i, system->getMasterName(i));
     }
 
     demandAvgMshrMissLatency.flags(total | nozero | nonan);
     demandAvgMshrMissLatency = demandMshrMissLatency / demandMshrMisses;
-    for (int i = 0; i < max_requestors; i++) {
-        demandAvgMshrMissLatency.subname(i, system->getRequestorName(i));
+    for (int i = 0; i < max_masters; i++) {
+        demandAvgMshrMissLatency.subname(i, system->getMasterName(i));
     }
 
     overallAvgMshrMissLatency.flags(total | nozero | nonan);
     overallAvgMshrMissLatency = overallMshrMissLatency / overallMshrMisses;
-    for (int i = 0; i < max_requestors; i++) {
-        overallAvgMshrMissLatency.subname(i, system->getRequestorName(i));
+    for (int i = 0; i < max_masters; i++) {
+        overallAvgMshrMissLatency.subname(i, system->getMasterName(i));
     }
 
     overallAvgMshrUncacheableLatency.flags(total | nozero | nonan);
     overallAvgMshrUncacheableLatency =
         overallMshrUncacheableLatency / overallMshrUncacheable;
-    for (int i = 0; i < max_requestors; i++) {
-        overallAvgMshrUncacheableLatency.subname(i, system->getRequestorName(i));
+    for (int i = 0; i < max_masters; i++) {
+        overallAvgMshrUncacheableLatency.subname(i, system->getMasterName(i));
     }
 
     dataExpansions.flags(nozero | nonan);
@@ -2291,7 +2290,7 @@ BaseCache::CpuSidePort::recvTimingSnoopResp(PacketPtr pkt)
 
     assert(pkt->isResponse());
 
-    // Express snoop responses from requestor to responder, e.g., from L1 to L2
+    // Express snoop responses from master to slave, e.g., from L1 to L2
     cache->recvTimingSnoopResp(pkt);
     return true;
 }
@@ -2320,7 +2319,7 @@ BaseCache::CpuSidePort::recvTimingReq(PacketPtr pkt)
     if (cache->system->bypassCaches()) {
         // Just forward the packet if caches are disabled.
         // @todo This should really enqueue the packet rather
-        M5_VAR_USED bool success = cache->memSidePort.sendTimingReq(pkt);
+        bool M5_VAR_USED success = cache->memSidePort.sendTimingReq(pkt);
         assert(success);
         return true;
     } else if (tryTiming(pkt)) {
@@ -2365,7 +2364,7 @@ BaseCache::CpuSidePort::getAddrRanges() const
 BaseCache::
 CpuSidePort::CpuSidePort(const std::string &_name, BaseCache *_cache,
                          const std::string &_label)
-    : CacheResponsePort(_name, _cache, _label), cache(_cache)
+    : CacheSlavePort(_name, _cache, _label), cache(_cache)
 {
 }
 
@@ -2452,7 +2451,7 @@ BaseCache::CacheReqPacketQueue::sendDeferredPacket()
 BaseCache::MemSidePort::MemSidePort(const std::string &_name,
                                     BaseCache *_cache,
                                     const std::string &_label)
-    : CacheRequestPort(_name, _cache, _reqQueue, _snoopRespQueue),
+    : CacheMasterPort(_name, _cache, _reqQueue, _snoopRespQueue),
       _reqQueue(*_cache, *this, _snoopRespQueue, _label),
       _snoopRespQueue(*_cache, *this, true, _label), cache(_cache)
 {

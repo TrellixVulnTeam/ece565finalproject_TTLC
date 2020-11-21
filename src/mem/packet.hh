@@ -58,7 +58,6 @@
 #include "base/logging.hh"
 #include "base/printable.hh"
 #include "base/types.hh"
-#include "mem/htm.hh"
 #include "mem/request.hh"
 #include "sim/core.hh"
 
@@ -84,7 +83,6 @@ class MemCmd
         ReadRespWithInvalidate,
         WriteReq,
         WriteResp,
-        WriteCompleteResp,
         WritebackDirty,
         WritebackClean,
         WriteClean,            // writes dirty data below without evicting
@@ -112,8 +110,6 @@ class MemCmd
         SwapResp,
         // MessageReq and MessageResp are deprecated.
         MemFenceReq = SwapResp + 3,
-        MemSyncReq,  // memory synchronization request (e.g., cache invalidate)
-        MemSyncResp, // memory synchronization response
         MemFenceResp,
         CleanSharedReq,
         CleanSharedResp,
@@ -132,10 +128,6 @@ class MemCmd
         FlushReq,      //request for a cache flush
         InvalidateReq,   // request for address to be invalidated
         InvalidateResp,
-        // hardware transactional memory
-        HTMReq,
-        HTMReqResp,
-        HTMAbort,
         NUM_MEM_CMDS
     };
 
@@ -250,7 +242,7 @@ class MemCmd
 /**
  * A Packet is used to encapsulate a transfer between two objects in
  * the memory system (e.g., the L1 and L2 cache).  (In contrast, a
- * single Request travels all the way from the requestor to the
+ * single Request travels all the way from the requester to the
  * ultimate destination and back, possibly being conveyed by several
  * different Packets along the way.)
  */
@@ -264,7 +256,7 @@ class Packet : public Printable
 
     enum : FlagsType {
         // Flags to transfer across when copying a packet
-        COPY_FLAGS             = 0x000000FF,
+        COPY_FLAGS             = 0x0000003F,
 
         // Flags that are used to create reponse packets
         RESPONDER_FLAGS        = 0x00000009,
@@ -293,17 +285,6 @@ class Packet : public Printable
         // Response co-ordination flag for cache maintenance
         // operations
         SATISFIED              = 0x00000020,
-
-        // hardware transactional memory
-
-        // Indicates that this packet/request has returned from the
-        // cache hierarchy in a failed transaction. The core is
-        // notified like this.
-        FAILS_TRANSACTION      = 0x00000040,
-
-        // Indicates that this packet/request originates in the CPU executing
-        // in transactional mode, i.e. in a transaction.
-        FROM_TRANSACTION       = 0x00000080,
 
         /// Are the 'addr' and 'size' fields valid?
         VALID_ADDR             = 0x00000100,
@@ -366,21 +347,6 @@ class Packet : public Printable
 
     // Quality of Service priority value
     uint8_t _qosValue;
-
-    // hardware transactional memory
-
-    /**
-     * Holds the return status of the transaction.
-     * The default case will be NO_FAIL, otherwise this will specify the
-     * reason for the transaction's failure in the memory subsystem.
-     */
-    HtmCacheFailure htmReturnReason;
-
-    /**
-     * A global unique identifier of the transaction.
-     * This is used for correctness/debugging only.
-     */
-    uint64_t htmTransactionUid;
 
   public:
 
@@ -737,7 +703,7 @@ class Packet : public Printable
     inline void qosValue(const uint8_t qos_value)
     { _qosValue = qos_value; }
 
-    inline RequestorID requestorId() const { return req->requestorId(); }
+    inline MasterID masterId() const { return req->masterId(); }
 
     // Network error conditions... encapsulate them as methods since
     // their encoding keeps changing (from result field to command
@@ -824,32 +790,13 @@ class Packet : public Printable
     Packet(const RequestPtr &_req, MemCmd _cmd)
         :  cmd(_cmd), id((PacketId)_req.get()), req(_req),
            data(nullptr), addr(0), _isSecure(false), size(0),
-           _qosValue(0),
-           htmReturnReason(HtmCacheFailure::NO_FAIL),
-           htmTransactionUid(0),
-           headerDelay(0), snoopDelay(0),
+           _qosValue(0), headerDelay(0), snoopDelay(0),
            payloadDelay(0), senderState(NULL)
     {
-        flags.clear();
         if (req->hasPaddr()) {
             addr = req->getPaddr();
             flags.set(VALID_ADDR);
             _isSecure = req->isSecure();
-        }
-
-        /**
-         * hardware transactional memory
-         *
-         * This is a bit of a hack!
-         * Technically the address of a HTM command is set to zero
-         * but is not valid. The reason that we pretend it's valid is
-         * to void the getAddr() function from failing. It would be
-         * cumbersome to add control flow in many places to check if the
-         * packet represents a HTM command before calling getAddr().
-         */
-        if (req->isHTMCmd()) {
-            flags.set(VALID_ADDR);
-            assert(addr == 0x0);
         }
         if (req->hasSize()) {
             size = req->getSize();
@@ -865,13 +812,9 @@ class Packet : public Printable
     Packet(const RequestPtr &_req, MemCmd _cmd, int _blkSize, PacketId _id = 0)
         :  cmd(_cmd), id(_id ? _id : (PacketId)_req.get()), req(_req),
            data(nullptr), addr(0), _isSecure(false),
-           _qosValue(0),
-           htmReturnReason(HtmCacheFailure::NO_FAIL),
-           htmTransactionUid(0),
-           headerDelay(0),
+           _qosValue(0), headerDelay(0),
            snoopDelay(0), payloadDelay(0), senderState(NULL)
     {
-        flags.clear();
         if (req->hasPaddr()) {
             addr = req->getPaddr() & ~(_blkSize - 1);
             flags.set(VALID_ADDR);
@@ -894,8 +837,6 @@ class Packet : public Printable
            addr(pkt->addr), _isSecure(pkt->_isSecure), size(pkt->size),
            bytesValid(pkt->bytesValid),
            _qosValue(pkt->qosValue()),
-           htmReturnReason(HtmCacheFailure::NO_FAIL),
-           htmTransactionUid(0),
            headerDelay(pkt->headerDelay),
            snoopDelay(0),
            payloadDelay(pkt->payloadDelay),
@@ -905,15 +846,6 @@ class Packet : public Printable
             flags.set(pkt->flags & COPY_FLAGS);
 
         flags.set(pkt->flags & (VALID_ADDR|VALID_SIZE));
-
-        if (pkt->isHtmTransactional())
-            setHtmTransactional(pkt->getHtmTransactionUid());
-
-        if (pkt->htmTransactionFailedInCache()) {
-            setHtmTransactionFailedInCache(
-                pkt->getHtmTransactionFailedInCacheRC()
-            );
-        }
 
         // should we allocate space for data, or not, the express
         // snoops do not need to carry any data as they only serve to
@@ -938,12 +870,7 @@ class Packet : public Printable
     static MemCmd
     makeReadCmd(const RequestPtr &req)
     {
-        if (req->isHTMCmd()) {
-            if (req->isHTMAbort())
-                return MemCmd::HTMAbort;
-            else
-                return MemCmd::HTMReq;
-        } else if (req->isLLSC())
+        if (req->isLLSC())
             return MemCmd::LoadLockedReq;
         else if (req->isPrefetchEx())
             return MemCmd::SoftPFExReq;
@@ -1416,58 +1343,6 @@ class Packet : public Printable
      * @return string with the request's type and start<->end addresses
      */
     std::string print() const;
-
-    // hardware transactional memory
-
-    /**
-     * Communicates to the core that a packet was processed by the memory
-     * subsystem while running in transactional mode.
-     * It may happen that the transaction has failed at the memory subsystem
-     * and this needs to be communicated to the core somehow.
-     * This function decorates the response packet with flags to indicate
-     * such a situation has occurred.
-     */
-    void makeHtmTransactionalReqResponse(const HtmCacheFailure ret_code);
-
-    /**
-     * Stipulates that this packet/request originates in the CPU executing
-     * in transactional mode, i.e. within a transaction.
-     */
-    void setHtmTransactional(uint64_t val);
-
-    /**
-     * Returns whether or not this packet/request originates in the CPU
-     * executing in transactional mode, i.e. within a transaction.
-     */
-    bool isHtmTransactional() const;
-
-    /**
-     * If a packet/request originates in a CPU executing in transactional
-     * mode, i.e. within a transaction, this function returns the unique ID
-     * of the transaction. This is used for verifying correctness
-     * and debugging.
-     */
-    uint64_t getHtmTransactionUid() const;
-
-    /**
-     * Stipulates that this packet/request has returned from the
-     * cache hierarchy in a failed transaction. The core is
-     * notified like this.
-     */
-    void setHtmTransactionFailedInCache(const HtmCacheFailure ret_code);
-
-    /**
-     * Returns whether or not this packet/request has returned from the
-     * cache hierarchy in a failed transaction. The core is
-     * notified liked this.
-     */
-    bool htmTransactionFailedInCache() const;
-
-    /**
-     * If a packet/request has returned from the cache hierarchy in a
-     * failed transaction, this function returns the failure reason.
-     */
-    HtmCacheFailure getHtmTransactionFailedInCacheRC() const;
 };
 
 #endif //__MEM_PACKET_HH

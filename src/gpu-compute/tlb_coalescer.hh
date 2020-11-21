@@ -41,6 +41,7 @@
 
 #include "arch/generic/tlb.hh"
 #include "arch/isa.hh"
+#include "arch/isa_traits.hh"
 #include "arch/x86/pagetable.hh"
 #include "arch/x86/regs/segment.hh"
 #include "base/logging.hh"
@@ -64,6 +65,13 @@ class ThreadContext;
  */
 class TLBCoalescer : public ClockedObject
 {
+   protected:
+    // TLB clock: will inherit clock from shader's clock period in terms
+    // of nuber of ticks of curTime (aka global simulation clock)
+    // The assignment of TLB clock from shader clock is done in the
+    // python config files.
+    int clock;
+
   public:
     typedef TLBCoalescerParams Params;
     TLBCoalescer(const Params *p);
@@ -97,8 +105,7 @@ class TLBCoalescer : public ClockedObject
      * option is to change it to curTick(), so we coalesce based
      * on the receive time.
      */
-    typedef std::unordered_map<int64_t, std::vector<coalescedReq>>
-        CoalescingFIFO;
+    typedef std::unordered_map<int64_t, std::vector<coalescedReq>> CoalescingFIFO;
 
     CoalescingFIFO coalescerFIFO;
 
@@ -136,12 +143,19 @@ class TLBCoalescer : public ClockedObject
     void updatePhysAddresses(PacketPtr pkt);
     void regStats() override;
 
-    class CpuSidePort : public ResponsePort
+    // Clock related functions. Maps to-and-from
+    // Simulation ticks and object clocks.
+    Tick frequency() const { return SimClock::Frequency / clock; }
+    Tick ticks(int numCycles) const { return (Tick)clock * numCycles; }
+    Tick curCycle() const { return curTick() / clock; }
+    Tick tickToCycles(Tick val) const { return val / clock;}
+
+    class CpuSidePort : public SlavePort
     {
       public:
         CpuSidePort(const std::string &_name, TLBCoalescer *tlb_coalescer,
                     PortID _index)
-            : ResponsePort(_name, tlb_coalescer), coalescer(tlb_coalescer),
+            : SlavePort(_name, tlb_coalescer), coalescer(tlb_coalescer),
               index(_index) { }
 
       protected:
@@ -157,19 +171,18 @@ class TLBCoalescer : public ClockedObject
         virtual void
         recvRespRetry()
         {
-            fatal("recvRespRetry() is not implemented in the TLB "
-                "coalescer.\n");
+            fatal("recvRespRetry() is not implemented in the TLB coalescer.\n");
         }
 
         virtual AddrRangeList getAddrRanges() const;
     };
 
-    class MemSidePort : public RequestPort
+    class MemSidePort : public MasterPort
     {
       public:
         MemSidePort(const std::string &_name, TLBCoalescer *tlb_coalescer,
                     PortID _index)
-            : RequestPort(_name, tlb_coalescer), coalescer(tlb_coalescer),
+            : MasterPort(_name, tlb_coalescer), coalescer(tlb_coalescer),
               index(_index) { }
 
         std::deque<PacketPtr> retries;
@@ -191,9 +204,9 @@ class TLBCoalescer : public ClockedObject
         }
     };
 
-    // Coalescer response ports on the cpu Side
+    // Coalescer slave ports on the cpu Side
     std::vector<CpuSidePort*> cpuSidePort;
-    // Coalescer request ports on the memory side
+    // Coalescer master ports on the memory side
     std::vector<MemSidePort*> memSidePort;
 
     Port &getPort(const std::string &if_name,

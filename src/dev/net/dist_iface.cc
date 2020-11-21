@@ -60,7 +60,7 @@ System *DistIface::sys = nullptr;
 DistIface::SyncEvent *DistIface::syncEvent = nullptr;
 unsigned DistIface::distIfaceNum = 0;
 unsigned DistIface::recvThreadsNum = 0;
-DistIface *DistIface::primary = nullptr;
+DistIface *DistIface::master = nullptr;
 bool DistIface::isSwitch = false;
 
 void
@@ -142,7 +142,7 @@ DistIface::SyncNode::run(bool same_tick)
         needExit = ReqType::pending;
     if (needStopSync != ReqType::none)
         needStopSync = ReqType::pending;
-    DistIface::primary->sendCmd(header);
+    DistIface::master->sendCmd(header);
     // now wait until all receiver threads complete the synchronisation
     auto lf = [this]{ return waitNum == 0; };
     cv.wait(sync_lock, lf);
@@ -191,7 +191,7 @@ DistIface::SyncSwitch::run(bool same_tick)
     } else {
         header.needStopSync = ReqType::none;
     }
-    DistIface::primary->sendCmd(header);
+    DistIface::master->sendCmd(header);
     return true;
 }
 
@@ -410,7 +410,9 @@ DistIface::SyncEvent::process()
             start();
         } else {
             // Wake up thread contexts on non-switch nodes.
-            for (auto *tc: primary->sys->threads) {
+            for (int i = 0; i < DistIface::master->sys->numContexts(); i++) {
+                ThreadContext *tc =
+                    DistIface::master->sys->getThreadContext(i);
                 if (tc->status() == ThreadContext::Suspended)
                     tc->activate();
                 else
@@ -503,10 +505,10 @@ DistIface::RecvScheduler::pushPacket(EthPacketPtr new_packet,
             "send_tick:%llu send_delay:%llu link_delay:%llu recv_tick:%llu\n",
             send_tick, send_delay, linkDelay, recv_tick);
     // Every packet must be sent and arrive in the same quantum
-    assert(send_tick > primary->syncEvent->when() -
-           primary->syncEvent->repeat);
+    assert(send_tick > master->syncEvent->when() -
+           master->syncEvent->repeat);
     // No packet may be scheduled for receive in the arrival quantum
-    assert(send_tick + send_delay + linkDelay > primary->syncEvent->when());
+    assert(send_tick + send_delay + linkDelay > master->syncEvent->when());
 
     // Now we are about to schedule a recvDone event for the new data packet.
     // We use the same recvDone object for all incoming data packets. Packet
@@ -611,8 +613,8 @@ DistIface::DistIface(unsigned dist_rank,
     rank(dist_rank), size(dist_size)
 {
     DPRINTF(DistEthernet, "DistIface() ctor rank:%d\n",dist_rank);
-    isPrimary = false;
-    if (primary == nullptr) {
+    isMaster = false;
+    if (master == nullptr) {
         assert(sync == nullptr);
         assert(syncEvent == nullptr);
         isSwitch = is_switch;
@@ -621,8 +623,8 @@ DistIface::DistIface(unsigned dist_rank,
         else
             sync = new SyncNode();
         syncEvent = new SyncEvent();
-        primary = this;
-        isPrimary = true;
+        master = this;
+        isMaster = true;
     }
     distIfaceId = distIfaceNum;
     distIfaceNum++;
@@ -639,8 +641,8 @@ DistIface::~DistIface()
         assert(sync);
         delete sync;
     }
-    if (this == primary)
-        primary = nullptr;
+    if (this == master)
+        master = nullptr;
 }
 
 void
@@ -728,7 +730,7 @@ DistIface::drain()
 {
     DPRINTF(DistEthernet,"DistIFace::drain() called\n");
     // This can be called multiple times in the same drain cycle.
-    if (this == primary)
+    if (this == master)
         syncEvent->draining(true);
     return DrainState::Drained;
 }
@@ -736,7 +738,7 @@ DistIface::drain()
 void
 DistIface::drainResume() {
     DPRINTF(DistEthernet,"DistIFace::drainResume() called\n");
-    if (this == primary)
+    if (this == master)
         syncEvent->draining(false);
     recvScheduler.resumeRecvTicks();
 }
@@ -755,7 +757,7 @@ DistIface::serialize(CheckpointOut &cp) const
     SERIALIZE_SCALAR(dist_iface_id_orig);
 
     recvScheduler.serializeSection(cp, "recvScheduler");
-    if (this == primary) {
+    if (this == master) {
         sync->serializeSection(cp, "Sync");
     }
 }
@@ -774,7 +776,7 @@ DistIface::unserialize(CheckpointIn &cp)
              dist_iface_id_orig);
 
     recvScheduler.unserializeSection(cp, "recvScheduler");
-    if (this == primary) {
+    if (this == master) {
         sync->unserializeSection(cp, "Sync");
     }
 }
@@ -801,8 +803,8 @@ DistIface::init(const Event *done_event, Tick link_delay)
 
     // Initialize the seed for random generator to avoid the same sequence
     // in all gem5 peer processes
-    assert(primary != nullptr);
-    if (this == primary)
+    assert(master != nullptr);
+    if (this == master)
         random_mt.init(5489 * (rank+1) + 257);
 }
 
@@ -811,7 +813,7 @@ DistIface::startup()
 {
     DPRINTF(DistEthernet, "DistIface::startup() started\n");
     // Schedule synchronization unless we are not a switch in pseudo_op mode.
-    if (this == primary && (!syncStartOnPseudoOp || isSwitch))
+    if (this == master && (!syncStartOnPseudoOp || isSwitch))
         syncEvent->start();
     DPRINTF(DistEthernet, "DistIface::startup() done\n");
 }
@@ -822,7 +824,7 @@ DistIface::readyToCkpt(Tick delay, Tick period)
     bool ret = true;
     DPRINTF(DistEthernet, "DistIface::readyToCkpt() called, delay:%lu "
             "period:%lu\n", delay, period);
-    if (primary) {
+    if (master) {
         if (delay == 0) {
             inform("m5 checkpoint called with zero delay => triggering collaborative "
                    "checkpoint\n");
@@ -851,38 +853,40 @@ void
 DistIface::toggleSync(ThreadContext *tc)
 {
     // Unforunate that we have to populate the system pointer member this way.
-    primary->sys = tc->getSystemPtr();
+    master->sys = tc->getSystemPtr();
 
     // The invariant for both syncing and "unsyncing" is that all threads will
     // stop executing intructions until the desired sync state has been reached
     // for all nodes.  This is the easiest way to prevent deadlock (in the case
     // of "unsyncing") and causality errors (in the case of syncing).
-    if (primary->syncEvent->scheduled()) {
+    if (master->syncEvent->scheduled()) {
         inform("Request toggling syncronization off\n");
-        primary->sync->requestStopSync(ReqType::collective);
+        master->sync->requestStopSync(ReqType::collective);
 
         // At this point, we have no clue when everyone will reach the sync
         // stop point.  Suspend execution of all local thread contexts.
         // Dist-gem5 will reactivate all thread contexts when everyone has
         // reached the sync stop point.
 #if THE_ISA != NULL_ISA
-        for (auto *tc: primary->sys->threads) {
+        for (int i = 0; i < master->sys->numContexts(); i++) {
+            ThreadContext *tc = master->sys->getThreadContext(i);
             if (tc->status() == ThreadContext::Active)
                 tc->quiesce();
         }
 #endif
     } else {
         inform("Request toggling syncronization on\n");
-        primary->syncEvent->start();
+        master->syncEvent->start();
 
         // We need to suspend all CPUs until the sync point is reached by all
         // nodes to prevent causality errors.  We can also schedule CPU
         // activation here, since we know exactly when the next sync will
         // occur.
 #if THE_ISA != NULL_ISA
-        for (auto *tc: primary->sys->threads) {
+        for (int i = 0; i < master->sys->numContexts(); i++) {
+            ThreadContext *tc = master->sys->getThreadContext(i);
             if (tc->status() == ThreadContext::Active)
-                tc->quiesceTick(primary->syncEvent->when() + 1);
+                tc->quiesceTick(master->syncEvent->when() + 1);
         }
 #endif
     }
@@ -894,10 +898,10 @@ DistIface::readyToExit(Tick delay)
     bool ret = true;
     DPRINTF(DistEthernet, "DistIface::readyToExit() called, delay:%lu\n",
             delay);
-    if (primary) {
+    if (master) {
         // To successfully coordinate an exit, all nodes must be synchronising
-        if (!primary->syncEvent->scheduled())
-            primary->syncEvent->start();
+        if (!master->syncEvent->scheduled())
+            master->syncEvent->start();
 
         if (delay == 0) {
             inform("m5 exit called with zero delay => triggering collaborative "
@@ -917,8 +921,8 @@ uint64_t
 DistIface::rankParam()
 {
     uint64_t val;
-    if (primary) {
-        val = primary->rank;
+    if (master) {
+        val = master->rank;
     } else {
         warn("Dist-rank parameter is queried in single gem5 simulation.");
         val = 0;
@@ -930,8 +934,8 @@ uint64_t
 DistIface::sizeParam()
 {
     uint64_t val;
-    if (primary) {
-        val = primary->size;
+    if (master) {
+        val = master->size;
     } else {
         warn("Dist-size parameter is queried in single gem5 simulation.");
         val = 1;

@@ -34,18 +34,24 @@ from _m5.debug import schedBreak, setRemoteGDBPort
 from m5.util import printList
 
 def help():
-    sorted_flags = sorted(flags.items(), key=lambda kv: kv[0])
-
     print("Base Flags:")
-    for name, flag in filter(lambda kv: not isinstance(kv[1], CompoundFlag),
-                             sorted_flags):
-        print("    %s: %s" % (name, flag.desc))
+    for name in sorted(flags):
+        if name == 'All':
+            continue
+        flag = flags[name]
+        children = [c for c in flag.kids() ]
+        if not children:
+            print("    %s: %s" % (name, flag.desc()))
     print()
     print("Compound Flags:")
-    for name, flag in filter(lambda kv: isinstance(kv[1], CompoundFlag),
-                             sorted_flags):
-        print("    %s: %s" % (name, flag.desc))
-        printList([ c.name for c in flag.kids() ], indent=8)
+    for name in sorted(flags):
+        if name == 'All':
+            continue
+        flag = flags[name]
+        children = [c for c in flag.kids() ]
+        if children:
+            print("    %s: %s" % (name, flag.desc()))
+            printList([ c.name() for c in children ], indent=8)
     print()
 
 class AllFlags(Mapping):

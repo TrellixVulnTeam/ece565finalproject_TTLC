@@ -78,7 +78,7 @@ EmulationPageTable::remap(Addr vaddr, int64_t size, Addr new_vaddr)
             new_vaddr, size);
 
     while (size > 0) {
-        M5_VAR_USED auto new_it = pTable.find(new_vaddr);
+        auto new_it M5_VAR_USED = pTable.find(new_vaddr);
         auto old_it = pTable.find(vaddr);
         assert(old_it != pTable.end() && new_it == pTable.end());
 
@@ -168,8 +168,7 @@ EmulationPageTable::translate(const RequestPtr &req)
 void
 EmulationPageTable::serialize(CheckpointOut &cp) const
 {
-    ScopedCheckpointSection sec(cp, "ptable");
-    paramOut(cp, "size", pTable.size());
+    paramOut(cp, "ptable.size", pTable.size());
 
     PTable::size_type count = 0;
     for (auto &pte : pTable) {
@@ -186,8 +185,7 @@ void
 EmulationPageTable::unserialize(CheckpointIn &cp)
 {
     int count;
-    ScopedCheckpointSection sec(cp, "ptable");
-    paramIn(cp, "size", count);
+    paramIn(cp, "ptable.size", count);
 
     for (int i = 0; i < count; ++i) {
         ScopedCheckpointSection sec(cp, csprintf("Entry%d", i));

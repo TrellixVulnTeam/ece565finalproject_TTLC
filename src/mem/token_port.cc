@@ -40,13 +40,13 @@
 #include "debug/TokenPort.hh"
 
 void
-TokenRequestPort::bind(Port &peer)
+TokenMasterPort::bind(Port &peer)
 {
-    RequestPort::bind(peer);
+    MasterPort::bind(peer);
 }
 
 void
-TokenRequestPort::recvTokens(int num_tokens)
+TokenMasterPort::recvTokens(int num_tokens)
 {
     panic_if(!tokenManager, "TokenManager not set for %s.\n", name());
 
@@ -54,7 +54,7 @@ TokenRequestPort::recvTokens(int num_tokens)
 }
 
 bool
-TokenRequestPort::haveTokens(int num_tokens)
+TokenMasterPort::haveTokens(int num_tokens)
 {
     panic_if(!tokenManager, "TokenManager not set for %s.\n", name());
 
@@ -62,7 +62,7 @@ TokenRequestPort::haveTokens(int num_tokens)
 }
 
 void
-TokenRequestPort::acquireTokens(int num_tokens)
+TokenMasterPort::acquireTokens(int num_tokens)
 {
     panic_if(!tokenManager, "TokenManager not set for %s.\n", name());
 
@@ -70,58 +70,58 @@ TokenRequestPort::acquireTokens(int num_tokens)
 }
 
 void
-TokenRequestPort::setTokenManager(TokenManager *_tokenManager)
+TokenMasterPort::setTokenManager(TokenManager *_tokenManager)
 {
     tokenManager = _tokenManager;
 }
 
 void
-TokenResponsePort::sendTokens(int num_tokens)
+TokenSlavePort::sendTokens(int num_tokens)
 {
-    fatal_if(!tokenRequestPort, "Tried sendTokens to non-token requestor!\n");
+    fatal_if(!tokenMasterPort, "Tried sendTokens to non-token master!\n");
 
-    // Send tokens to a requestor
-    tokenRequestPort->recvTokens(num_tokens);
+    // Send tokens to a master
+    tokenMasterPort->recvTokens(num_tokens);
 }
 
 void
-TokenResponsePort::bind(Port& peer)
+TokenSlavePort::bind(Port& peer)
 {
-    // TokenResponsePort is allowed to bind to either TokenRequestPort or a
-    // RequestPort as fallback. If the type is a RequestPort, tokenRequestPort
+    // TokenSlavePort is allowed to bind to either TokenMasterPort or a
+    // MasterPort as fallback. If the type is a MasterPort, tokenMasterPort
     // is set to nullptr to indicate tokens should not be exchanged.
-    auto *token_request_port = dynamic_cast<TokenRequestPort*>(&peer);
-    auto *request_port = dynamic_cast<RequestPort*>(&peer);
-    if (!token_request_port && !request_port) {
-        fatal("Attempt to bind port %s to unsupported response port %s.",
+    auto *token_master_port = dynamic_cast<TokenMasterPort*>(&peer);
+    auto *master_port = dynamic_cast<MasterPort*>(&peer);
+    if (!token_master_port && !master_port) {
+        fatal("Attempt to bind port %s to unsupported slave port %s.",
               name(), peer.name());
-    } else if (token_request_port) {
-        // response port keeps track of the request port
-        tokenRequestPort = token_request_port;
+    } else if (token_master_port) {
+        // slave port keeps track of the master port
+        tokenMasterPort = token_master_port;
 
-        // request port also keeps track of response port
-        tokenRequestPort->bind(*this);
-    } else if (request_port) {
-        tokenRequestPort = nullptr;
+        // master port also keeps track of slave port
+        tokenMasterPort->bind(*this);
+    } else if (master_port) {
+        tokenMasterPort = nullptr;
     }
 }
 
 void
-TokenResponsePort::unbind()
+TokenSlavePort::unbind()
 {
-    ResponsePort::responderUnbind();
-    tokenRequestPort = nullptr;
+    SlavePort::slaveUnbind();
+    tokenMasterPort = nullptr;
 }
 
 void
-TokenResponsePort::recvRespRetry()
+TokenSlavePort::recvRespRetry()
 {
-    // fallback to QueuedResponsePort-like impl for now
+    // fallback to QueuedSlavePort-like impl for now
     panic_if(respQueue.empty(),
              "Attempted to retry a response when no retry was queued!\n");
 
     PacketPtr pkt = respQueue.front();
-    bool success = ResponsePort::sendTimingResp(pkt);
+    bool success = SlavePort::sendTimingResp(pkt);
 
     if (success) {
         respQueue.pop_front();
@@ -129,9 +129,9 @@ TokenResponsePort::recvRespRetry()
 }
 
 bool
-TokenResponsePort::sendTimingResp(PacketPtr pkt)
+TokenSlavePort::sendTimingResp(PacketPtr pkt)
 {
-    bool success = ResponsePort::sendTimingResp(pkt);
+    bool success = SlavePort::sendTimingResp(pkt);
 
     if (!success) {
         respQueue.push_back(pkt);

@@ -29,15 +29,26 @@
 #ifndef __ARCH_SPARC_ISA_TRAITS_HH__
 #define __ARCH_SPARC_ISA_TRAITS_HH__
 
+#include "arch/sparc/sparc_traits.hh"
+#include "arch/sparc/types.hh"
 #include "base/types.hh"
+#include "cpu/static_inst_fwd.hh"
 
 namespace SparcISA
 {
 
-const ByteOrder GuestByteOrder = ByteOrder::big;
+const ByteOrder GuestByteOrder = BigEndianByteOrder;
 
 const Addr PageShift = 13;
 const Addr PageBytes = ULL(1) << PageShift;
+
+StaticInstPtr decodeInst(ExtMachInst);
+
+// Memory accesses cannot be unaligned
+const bool HasUnalignedMemAcc = false;
+
+const bool CurThreadInfoImplemented = false;
+const int CurThreadInfoReg = -1;
 
 }
 

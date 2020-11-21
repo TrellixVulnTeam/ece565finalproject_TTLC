@@ -38,7 +38,7 @@
 #include "base/intmath.hh"
 #include "cpu/thread_context.hh"
 #include "sim/guest_abi.hh"
-#include "sim/proxy_ptr.hh"
+#include "sim/syscall_emul_buf.hh"
 
 class ThreadContext;
 
@@ -158,7 +158,8 @@ struct Aapcs64ArgumentBase
         state.nsaa = roundUp(state.nsaa, align);
 
         // Extract the value from it.
-        ConstVPtr<T> val(state.nsaa, tc);
+        TypedBufferArg<T> val(state.nsaa);
+        val.copyIn(tc->getVirtProxy());
 
         // Move the nsaa past this argument.
         state.nsaa += size;
@@ -349,7 +350,8 @@ struct Argument<Aapcs64, Composite, typename std::enable_if<
             // kept in a buffer, and the argument is actually a pointer to that
             // buffer.
             Addr addr = Argument<Aapcs64, Addr>::get(tc, state);
-            ConstVPtr<Composite> composite(addr, tc);
+            TypedBufferArg<Composite> composite(addr);
+            composite.copyIn(tc->getVirtProxy());
             return gtoh(*composite, ArmISA::byteOrder(tc));
         }
 
@@ -391,7 +393,7 @@ struct Result<Aapcs64, Composite, typename std::enable_if<
     {
         if (sizeof(Composite) > 16) {
             Addr addr = tc->readIntReg(ArmISA::INTREG_X8);
-            VPtr<Composite> composite(addr, tc);
+            TypedBufferArg<Composite> composite(addr);
             *composite = htog(c, ArmISA::byteOrder(tc));
             return;
         }

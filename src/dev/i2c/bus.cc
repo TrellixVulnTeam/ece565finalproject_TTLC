@@ -37,7 +37,6 @@
 
 #include "dev/i2c/bus.hh"
 
-#include "base/trace.hh"
 #include "debug/Checkpoint.hh"
 #include "dev/i2c/device.hh"
 #include "mem/packet_access.hh"

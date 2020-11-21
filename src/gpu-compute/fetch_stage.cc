@@ -36,35 +36,37 @@
 #include "gpu-compute/compute_unit.hh"
 #include "gpu-compute/wavefront.hh"
 
-FetchStage::FetchStage(const ComputeUnitParams* p, ComputeUnit &cu)
-    : numVectorALUs(p->num_SIMDs), computeUnit(cu),
-      _name(cu.name() + ".FetchStage")
+FetchStage::FetchStage(const ComputeUnitParams* p) : numSIMDs(p->num_SIMDs),
+    computeUnit(nullptr)
 {
-    for (int j = 0; j < numVectorALUs; ++j) {
-        FetchUnit newFetchUnit(p, cu);
-        _fetchUnit.push_back(newFetchUnit);
+    for (int j = 0; j < numSIMDs; ++j) {
+        FetchUnit newFetchUnit(p);
+        fetchUnit.push_back(newFetchUnit);
     }
 }
 
 FetchStage::~FetchStage()
 {
-    _fetchUnit.clear();
+    fetchUnit.clear();
 }
 
 void
-FetchStage::init()
+FetchStage::init(ComputeUnit *cu)
 {
-    for (int j = 0; j < numVectorALUs; ++j) {
-        _fetchUnit[j].bindWaveList(&computeUnit.wfList[j]);
-        _fetchUnit[j].init();
+    computeUnit = cu;
+    _name = computeUnit->name() + ".FetchStage";
+
+    for (int j = 0; j < numSIMDs; ++j) {
+        fetchUnit[j].bindWaveList(&computeUnit->wfList[j]);
+        fetchUnit[j].init(computeUnit);
     }
 }
 
 void
 FetchStage::exec()
 {
-    for (int j = 0; j < numVectorALUs; ++j) {
-        _fetchUnit[j].exec();
+    for (int j = 0; j < numSIMDs; ++j) {
+        fetchUnit[j].exec();
     }
 }
 
@@ -81,13 +83,13 @@ FetchStage::processFetchReturn(PacketPtr pkt)
 
     instFetchInstReturned.sample(num_instructions);
     uint32_t simdId = wavefront->simdId;
-    _fetchUnit[simdId].processFetchReturn(pkt);
+    fetchUnit[simdId].processFetchReturn(pkt);
 }
 
 void
 FetchStage::fetch(PacketPtr pkt, Wavefront *wavefront)
 {
-    _fetchUnit[wavefront->simdId].fetch(pkt, wavefront);
+    fetchUnit[wavefront->simdId].fetch(pkt, wavefront);
 }
 
 void
