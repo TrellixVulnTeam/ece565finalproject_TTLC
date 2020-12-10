@@ -20,18 +20,18 @@ Usage: Call through getPrediction(uint64_t pc, uint64_t& predicted_value)
 // static uint32_t load_path_history = 0;
 
 
-void printBinary(unsigned int number)
-{
-    if (number >> 1) {
-        printBinary(number >> 1);
-    }
-    putc((number & 1) ? '1' : '0', stdout);
-}
+// void printBinary(unsigned int number)
+// {
+//     if (number >> 1) {
+//         printBinary(number >> 1);
+//     }
+//     putc((number & 1) ? '1' : '0', stdout);
+// }
 
-void printBinaryNumber(unsigned int number){
-    printBinary(number);
-    puts("\n");
-}
+// void printBinaryNumber(unsigned int number){
+//     printBinary(number);
+//     puts("\n");
+// }
 
 void updateLoadPathHistory(uint64_t pc){
     uint32_t third_bit = (uint32_t) pc;
@@ -64,9 +64,9 @@ bool queryAPTHitMiss(unsigned int index_raw){
 
     struct APTEntry entry = getAPTEntry(index);
 
-    uint16_t entrytag = entry.tag;
+    uint16_t entryTag = entry.tag;
 
-    if(aptEntryTag == tag){
+    if(entryTag == tag){
         return true;
     }
 
@@ -111,6 +111,8 @@ APTEntry allocateNew(uint64_t address, uint64_t pc){
     entry.address = address;
     entry.confidence = 0;
     entry.size = 0;
+
+    return entry;
 }
 
 void trainAPT(uint64_t &predicted_val, uint64_t& actual_val, uint64_t pc){
@@ -134,7 +136,7 @@ void trainAPT(uint64_t &predicted_val, uint64_t& actual_val, uint64_t pc){
         // Incorrect prediction. Reset confidence and re-allocate entry
         else{
             // uint8_t new_conf = 0;
-            uint64_t* newAddress = &actual_val;
+            uint64_t newAddress = actual_val;
 
             // entry.tag = calcAPTTag(pc);
             // entry.address = new_address;
@@ -150,9 +152,9 @@ void trainAPT(uint64_t &predicted_val, uint64_t& actual_val, uint64_t pc){
     else{
         // allocate new
         if(entry.confidence == 0){
-            uint64_t* newAddress = &actual_val;
+            uint64_t newAddress = actual_val;
 
-            allocateNew(newAddress, pc);
+            APTEntry newEntry = allocateNew(newAddress, pc);
 
             setAPTEntry(indexAPT, newEntry);
         }
@@ -192,7 +194,7 @@ int main(){
 
     int temp_tag = 64 % 14;
     int temp_index = 64 % 1024;
-    myAPT.tag[temp_index] = temp_tag;
+    myAPT[temp_index].tag = temp_tag;
 
     int index;
 
@@ -205,7 +207,7 @@ int main(){
         indexAPT = calcAPTIndex(currPC);
         tagAPT = calcAPTTag(currPC);
 
-        bool hit = queryAPT(indexAPT);
+        bool hit = queryAPTHitMiss(indexAPT);
 
         if(hit){
             std::cout<<"hit"<<std::endl;

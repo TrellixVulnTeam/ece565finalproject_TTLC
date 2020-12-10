@@ -6,6 +6,7 @@ Description: Header file to provide definitions for mypredictor.cc
 */
 
 #include <stdint.h>
+#include <stdio.h>
 
 static const int APT_SIZE = 1024;
 static const int LOAD_PATH_REG_SIZE = 32;
@@ -20,9 +21,24 @@ struct APTEntry{
     uint64_t address = 0;
     uint8_t confidence = 0;
     uint8_t size = 0;
-}
+};
 
 static struct APTEntry myAPT[APT_SIZE];
+
+// Print helper inlines.
+inline void printBinary(unsigned int number)
+{
+    if (number >> 1) {
+        printBinary(number >> 1);
+    }
+    putc((number & 1) ? '1' : '0', stdout);
+}
+
+inline void printBinaryNumber(unsigned int number){
+    printBinary(number);
+    puts("\n");
+}
+
 
 void printBinary(unsigned int number);
 void printBinaryNumber(unsigned int number);
