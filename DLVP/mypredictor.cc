@@ -19,21 +19,7 @@ Usage: Call through getPrediction(uint64_t pc, uint64_t& predicted_value)
 
 // static uint32_t load_path_history = 0;
 
-
-// void printBinary(unsigned int number)
-// {
-//     if (number >> 1) {
-//         printBinary(number >> 1);
-//     }
-//     putc((number & 1) ? '1' : '0', stdout);
-// }
-
-// void printBinaryNumber(unsigned int number){
-//     printBinary(number);
-//     puts("\n");
-// }
-
-void updateLoadPathHistory(uint64_t pc){
+void MyPredictor::updateLoadPathHistory(uint64_t pc){
     uint32_t third_bit = (uint32_t) pc;
 
     third_bit = third_bit & 4; //.... yyyy xXxx -> 0000 0000 0X00
@@ -44,7 +30,7 @@ void updateLoadPathHistory(uint64_t pc){
     load_path_history = load_path_history + third_bit;
 }
 
-int calcAPTIndex(uint64_t pc){
+int MyPredictor::calcAPTIndex(uint64_t pc){
     int ind;
     //uint32_t lower_pc = (uint32_t) pc;
     ind = (uint32_t) pc ^ load_path_history;
@@ -52,13 +38,13 @@ int calcAPTIndex(uint64_t pc){
     return ind;
 }
 
-int calcAPTTag(uint64_t pc){
+int MyPredictor::calcAPTTag(uint64_t pc){
     int tag = calcAPTIndex(pc);
     tag = tag % TAG_BIT_LENGTH;
     return tag;
 }
 
-bool queryAPTHitMiss(unsigned int index_raw){
+bool MyPredictor::queryAPTHitMiss(unsigned int index_raw){
     unsigned int tag = index_raw % TAG_BIT_LENGTH;
     unsigned int index = index_raw % APT_SIZE;
 
@@ -73,19 +59,19 @@ bool queryAPTHitMiss(unsigned int index_raw){
     return false;
 }
 
-APTEntry getAPTEntry(unsigned int index){
+APTEntry MyPredictor::getAPTEntry(unsigned int index){
     // Assure index in bounds
     index = index % APT_SIZE;
     return myAPT[index];
 }
 
-void setAPTEntry(unsigned int index, APTEntry entry){
+void MyPredictor::setAPTEntry(unsigned int index, APTEntry entry){
     // Assure index in bounds
     index = index % APT_SIZE;
     myAPT[index] = entry;
 }
 
-uint8_t incrementConfidence(uint8_t old_conf){
+uint8_t MyPredictor::incrementConfidence(uint8_t old_conf){
     if(old_conf == 3){
         return old_conf;
     }
@@ -102,7 +88,7 @@ uint8_t incrementConfidence(uint8_t old_conf){
     return old_conf;
 }
 
-APTEntry allocateNew(uint64_t address, uint64_t pc){
+APTEntry MyPredictor::allocateNew(uint64_t address, uint64_t pc){
     APTEntry entry;
 
     // new confidence of 0
@@ -115,7 +101,35 @@ APTEntry allocateNew(uint64_t address, uint64_t pc){
     return entry;
 }
 
-void trainAPT(uint64_t &predicted_val, uint64_t& actual_val, uint64_t pc){
+bool MyPredictor::isCorrectPred(uint64_t &predictedAddr, uint64_t& actualAddr, uint64_t pc){
+    int indexAPT = calcAPTIndex(pc);
+
+    bool hit = queryAPTHitMiss(indexAPT);
+
+    if(hit){
+        // Correct prediction. Increment according to probability vector
+        if(predictedAddr == actualAddr){
+            return true;
+        }
+        // Incorrect prediction. Reset confidence and re-allocate entry
+        return false;
+    }
+}
+
+void MyPredictor::updateStats(uint64_t &predictedAddr, uint64_t& actualAddr, uint64_t pc){
+    if(isCorrectPred(predictedAddr, actualAddr, pc)){
+        myStats.numCorrect++;
+    }
+    myStats.total++;
+}
+
+void MyPredictor::printStats(){
+    std::cout<<myStats.numCorrect<<std::endl;
+    std::cout<<myStats.total<<std::endl;
+}
+
+
+void MyPredictor::trainAPT(uint64_t &predictedAddr, uint64_t& actualAddr, uint64_t pc){
     int indexAPT = calcAPTIndex(pc);
 
     bool hit = queryAPTHitMiss(indexAPT);
@@ -127,7 +141,7 @@ void trainAPT(uint64_t &predicted_val, uint64_t& actual_val, uint64_t pc){
 
     if(hit){
         // Correct prediction. Increment according to probability vector
-        if(predicted_val == actual_val){
+        if(predictedAddr == actualAddr){
             uint8_t conf = entry.confidence;
             uint8_t new_conf = incrementConfidence(conf);
             entry.confidence = new_conf;
@@ -136,7 +150,7 @@ void trainAPT(uint64_t &predicted_val, uint64_t& actual_val, uint64_t pc){
         // Incorrect prediction. Reset confidence and re-allocate entry
         else{
             // uint8_t new_conf = 0;
-            uint64_t newAddress = actual_val;
+            uint64_t newAddress = actualAddr;
 
             // entry.tag = calcAPTTag(pc);
             // entry.address = new_address;
@@ -152,7 +166,7 @@ void trainAPT(uint64_t &predicted_val, uint64_t& actual_val, uint64_t pc){
     else{
         // allocate new
         if(entry.confidence == 0){
-            uint64_t newAddress = actual_val;
+            uint64_t newAddress = actualAddr;
 
             APTEntry newEntry = allocateNew(newAddress, pc);
 
@@ -167,7 +181,7 @@ void trainAPT(uint64_t &predicted_val, uint64_t& actual_val, uint64_t pc){
     
 }
 
-bool getPrediction(uint64_t pc, uint64_t& predicted_address){
+bool MyPredictor::getPrediction(uint64_t pc, uint64_t* predicted_address_ptr){
     updateLoadPathHistory(pc);
 
     int indexAPT;
@@ -178,43 +192,10 @@ bool getPrediction(uint64_t pc, uint64_t& predicted_address){
     if(hit){
         std::cout<<"hit"<<std::endl;
         APTEntry entry = getAPTEntry(indexAPT);
-        predicted_address = entry.address;
+        *predicted_address_ptr = entry.address;
     }
     else{
         std::cout<<"miss"<<std::endl;
     }
     return hit;
-}
-
-int main(){
-    const int TEST_NUM = 4;
-    uint64_t pcList[TEST_NUM] = {64, 96, 64,128};
-
-    unsigned int currPC;
-
-    int temp_tag = 64 % 14;
-    int temp_index = 64 % 1024;
-    myAPT[temp_index].tag = temp_tag;
-
-    int index;
-
-    for(int i = 0; i <TEST_NUM; i++){
-        currPC = (unsigned int) pcList[i];
-        printBinaryNumber(currPC);
-
-        updateLoadPathHistory(currPC);
-        int indexAPT, tagAPT;
-        indexAPT = calcAPTIndex(currPC);
-        tagAPT = calcAPTTag(currPC);
-
-        bool hit = queryAPTHitMiss(indexAPT);
-
-        if(hit){
-            std::cout<<"hit"<<std::endl;
-        }
-        else{
-            std::cout<<"miss"<<std::endl;
-            //std::cout<<indexAPT<<std::endl;
-        }
-    }
 }
