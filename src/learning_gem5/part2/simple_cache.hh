@@ -36,6 +36,8 @@
 #include "params/SimpleCache.hh"
 #include "sim/clocked_object.hh"
 
+#include "mypredictor.h"
+
 /**
  * A very simple cache object. Has a fully-associative data store with random
  * replacement.
@@ -45,6 +47,7 @@
  */
 class SimpleCache : public ClockedObject
 {
+    
   private:
 
     /**

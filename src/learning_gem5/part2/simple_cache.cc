@@ -32,6 +32,13 @@
 #include "debug/SimpleCache.hh"
 #include "sim/system.hh"
 
+// Conor
+#include "mypredictor.h"
+#include "debug/DLVPDebug.hh"
+
+// To appease visual studio
+// MyPredictor myPred;
+
 SimpleCache::SimpleCache(SimpleCacheParams *params) :
     ClockedObject(params),
     latency(params->latency),
@@ -47,6 +54,9 @@ SimpleCache::SimpleCache(SimpleCacheParams *params) :
     for (int i = 0; i < params->port_cpu_side_connection_count; ++i) {
         cpuPorts.emplace_back(name() + csprintf(".cpu_side[%d]", i), i, this);
     }
+
+    //Conors code to init myPred MyPredictor object
+    //static MyPredictor myPred = MyPredictor();
 }
 
 Port &
@@ -222,6 +232,37 @@ SimpleCache::handleResponse(PacketPtr pkt)
     insert(pkt);
 
     missLatency.sample(curTick() - missTime);
+
+    //Conors addition to test load addresss predcition
+    // Applies to LOADS only
+    if(pkt->isRead()){
+        Addr actualAddr = pkt->getAddr();
+        RequestPtr theReq = pkt->req;
+        Addr reqPC = theReq->getPC();
+        Addr* predictedAddr_ptr = 0;  // getPrediction will modify value pointed to by this
+
+        // myPred object of mypredictor type
+        
+
+        updateLoadPathHistory(reqPC);
+
+        bool hasPrediction = getPrediction(reqPC, predictedAddr_ptr);
+
+        if (hasPrediction){
+            Addr predictedAddr = *predictedAddr_ptr;
+
+            updateStats(predictedAddr, actualAddr, reqPC);
+
+            printStats();
+
+            trainAPT(predictedAddr, actualAddr, reqPC);
+
+            DPRINTF(DLVPDebug, "Predicted load with PC: %" PRIx64 "\nPredicted address was: %" PRIu64 "\nActual was: %" PRIu64 "\n", reqPC, predictedAddr , actualAddr);
+        }
+
+        
+    }// end load address prediction
+    
 
     // If we had to upgrade the request packet to a full cache line, now we
     // can use that packet to construct the response.

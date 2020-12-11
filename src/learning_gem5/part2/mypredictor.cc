@@ -17,7 +17,8 @@ Usage: Call through getPrediction(uint64_t pc, uint64_t& predicted_value)
 // static const int APT_SIZE = 1024;
 // static const int LOAD_PATH_REG_SIZE = 32;
 
-// static uint32_t load_path_history = 0;
+loadPathHistory = 0;
+uint32_t appeaseCompiler = loadPathHistory;
 
 void updateLoadPathHistory(uint64_t pc){
     uint32_t third_bit = (uint32_t) pc;
@@ -25,15 +26,15 @@ void updateLoadPathHistory(uint64_t pc){
     third_bit = third_bit & 4; //.... yyyy xXxx -> 0000 0000 0X00
 
     third_bit = third_bit << LOAD_PATH_REG_SIZE - 3; //MSB is desired bit
-    load_path_history = load_path_history >> 1; // .... yyyy xxxx -> 0... .yyy yxxx
+    loadPathHistory = loadPathHistory >> 1; // .... yyyy xxxx -> 0... .yyy yxxx
 
-    load_path_history = load_path_history + third_bit;
+    loadPathHistory = loadPathHistory + third_bit;
 }
 
 int calcAPTIndex(uint64_t pc){
     int ind;
     //uint32_t lower_pc = (uint32_t) pc;
-    ind = (uint32_t) pc ^ load_path_history;
+    ind = (uint32_t) pc ^ loadPathHistory;
 
     return ind;
 }
@@ -101,7 +102,7 @@ APTEntry allocateNew(uint64_t address, uint64_t pc){
     return entry;
 }
 
-bool MyPredictor::isCorrectPred(uint64_t &predictedAddr, uint64_t& actualAddr, uint64_t pc){
+bool isCorrectPred(uint64_t &predictedAddr, uint64_t& actualAddr, uint64_t pc){
     int indexAPT = calcAPTIndex(pc);
 
     bool hit = queryAPTHitMiss(indexAPT);
@@ -116,20 +117,19 @@ bool MyPredictor::isCorrectPred(uint64_t &predictedAddr, uint64_t& actualAddr, u
     }
 }
 
-void MyPredictor::updateStats(uint64_t &predictedAddr, uint64_t& actualAddr, uint64_t pc){
+void updateStats(uint64_t &predictedAddr, uint64_t& actualAddr, uint64_t pc){
     if(isCorrectPred(predictedAddr, actualAddr, pc)){
         myStats.numCorrect++;
     }
     myStats.total++;
 }
 
-void MyPredictor::printStats(){
+void printStats(){
     std::cout<<myStats.numCorrect<<std::endl;
     std::cout<<myStats.total<<std::endl;
 }
 
-
-void MyPredictor::trainAPT(uint64_t &predictedAddr, uint64_t& actualAddr, uint64_t pc){
+void trainAPT(uint64_t &predictedAddr, uint64_t& actualAddr, uint64_t pc){
     int indexAPT = calcAPTIndex(pc);
 
     bool hit = queryAPTHitMiss(indexAPT);
@@ -181,8 +181,9 @@ void MyPredictor::trainAPT(uint64_t &predictedAddr, uint64_t& actualAddr, uint64
     
 }
 
-bool MyPredictor::getPrediction(uint64_t pc, uint64_t* predicted_address_ptr){
-    updateLoadPathHistory(pc);
+bool getPrediction(uint64_t pc, uint64_t* predicted_address_ptr){
+    // manually called
+    // updateLoadPathHistory(pc); 
 
     int indexAPT;
     indexAPT = calcAPTIndex(pc);
