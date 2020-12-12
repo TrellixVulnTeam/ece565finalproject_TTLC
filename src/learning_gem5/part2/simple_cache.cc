@@ -253,7 +253,7 @@ SimpleCache::handleResponse(PacketPtr pkt)
 
             updateStats(predictedAddr, actualAddr, reqPC);
 
-            printStats();            
+            printStatsWithLimit();
 
             DPRINTF(DLVPDebug, "Predicted load with PC: %" PRIx64 "\nPredicted address was: %" PRIu64 "\nActual was: %" PRIu64 "\n", reqPC, predictedAddr , actualAddr);
         }

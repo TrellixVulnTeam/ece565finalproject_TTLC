@@ -1,4 +1,15 @@
 # -*- coding: utf-8 -*-
+
+# Title: simple_cache_benchmarking
+# Author: Conor Green
+# Purpose: Final Project for ECE565
+# Description: Runs benchmarks (as specified through the command line) on
+#     the O3CPU with a "simple_cache." Heavily based on Jason Lowe Power's
+#     simple_cache config script. His copyright is given below.
+# Usage: Call as script through command line.
+#         Command line parameter '-b' for spec2k6 benchmark to run
+
+
 # Copyright (c) 2017 Jason Lowe-Power
 # All rights reserved.
 #
@@ -41,8 +52,28 @@ from m5.objects import *
 
 import optparse
 
+import spec2k6_simple_cache
+
 
 m5.util.addToPath('../common')
+
+bench_dir='/home/min/a/ece565/benchspec-2020/CPU2006/'
+# X86
+benchtype = '-m64-gcc43-nn'
+
+
+parser = optparse.OptionParser()
+
+parser.add_option("-b", "--benchmark", default="",
+                 help="The benchmark to be loaded.")
+
+(options, args) = parser.parse_args()
+
+print(options)
+
+if args:
+    print("Error: script doesn't take any positional arguments")
+    sys.exit(1)
 
 # create the system we are going to simulate
 system = System()
@@ -89,16 +120,8 @@ system.mem_ctrl.port = system.membus.master
 system.system_port = system.membus.slave
 
 # Create a process for a simple "Hello World" application
-process = Process()
-# Set the command
-# grab the specific path to the binary
-thispath = os.path.dirname(os.path.realpath(__file__))
+process = spec2k6_simple_cache.get_process(options)
 
-
-binpath = os.path.join(thispath, '../../../',
-                       'tests/test-progs/hello/bin/x86/linux/hello')
-# cmd is a list which begins with the executable (like argv)
-process.cmd = [binpath]
 # Set the cpu to use the process as its workload and create thread contexts
 system.cpu.workload = process
 system.cpu.createThreads()

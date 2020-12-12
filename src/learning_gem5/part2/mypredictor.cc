@@ -135,6 +135,14 @@ void printStats(){
     std::cout<<myStats.total<<std::endl;
 }
 
+void printStatsWithLimit(){
+    unsigned int currTotal = myStats.total;
+    if(currTotal <= NUM_LOADS_TO_PREDICT){
+        std::cout<<myStats.numCorrect<<std::endl;
+        std::cout<<myStats.total<<std::endl;
+    }
+}
+
 void trainAPT(uint64_t &predictedAddr, uint64_t& actualAddr, uint64_t pc){
     unsigned int indexAPT = calcAPTIndex(pc);
 

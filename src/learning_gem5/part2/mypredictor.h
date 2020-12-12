@@ -25,6 +25,8 @@ inline void printBinaryNumber(unsigned int number){
     puts("\n");
 }
 
+static const unsigned int NUM_LOADS_TO_PREDICT = 100000;
+
 static const int APT_SIZE = 1024;
 static const int LOAD_PATH_REG_SIZE = 32;
 static const int TAG_BIT_LENGTH = 14;
@@ -75,6 +77,7 @@ bool isCorrectPred(uint64_t &predictedAddr, uint64_t& actualAddr, uint64_t pc);
 void updateStats(uint64_t &predictedAddr, uint64_t& actualAddr, uint64_t pc);
 
 void printStats();
+void printStatsWithLimit();
 
 void trainAPT(uint64_t &predicted_val, uint64_t& actual_val, uint64_t pc);
 
