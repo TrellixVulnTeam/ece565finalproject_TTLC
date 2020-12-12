@@ -37,6 +37,7 @@ Source('hello_object.cc')
 Source('goodbye_object.cc')
 Source('simple_memobj.cc')
 Source('simple_cache.cc')
+Source('mypredictor.cc')
 
 DebugFlag('HelloExample', "For Learning gem5 Part 2. Simple example debug flag")
 DebugFlag('SimpleMemobj', "For Learning gem5 Part 2.")

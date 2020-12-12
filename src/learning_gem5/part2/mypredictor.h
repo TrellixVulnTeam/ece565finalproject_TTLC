@@ -42,9 +42,15 @@ struct APTEntry{
     uint8_t size = 0;
 };
 
-static struct stats myStats;
-static struct APTEntry myAPT[APT_SIZE];
-static uint32_t loadPathHistory;
+// extern stats myStats;
+// extern APTEntry myAPT[APT_SIZE];
+// extern uint32_t loadPathHistory;
+// loadPathHistory = 0;
+
+extern stats myStats;
+extern APTEntry myAPT[APT_SIZE];
+extern uint32_t loadPathHistory;
+// loadPathHistory = 0;
 
 
 void printBinary(unsigned int number);

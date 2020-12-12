@@ -17,15 +17,16 @@ Usage: Call through getPrediction(uint64_t pc, uint64_t& predicted_value)
 // static const int APT_SIZE = 1024;
 // static const int LOAD_PATH_REG_SIZE = 32;
 
-loadPathHistory = 0;
-uint32_t appeaseCompiler = loadPathHistory;
+stats myStats;
+APTEntry myAPT[APT_SIZE];
+uint32_t loadPathHistory;
 
 void updateLoadPathHistory(uint64_t pc){
     uint32_t third_bit = (uint32_t) pc;
 
     third_bit = third_bit & 4; //.... yyyy xXxx -> 0000 0000 0X00
 
-    third_bit = third_bit << LOAD_PATH_REG_SIZE - 3; //MSB is desired bit
+    third_bit = third_bit << (LOAD_PATH_REG_SIZE - 3); //MSB is desired bit
     loadPathHistory = loadPathHistory >> 1; // .... yyyy xxxx -> 0... .yyy yxxx
 
     loadPathHistory = loadPathHistory + third_bit;
@@ -77,13 +78,14 @@ uint8_t incrementConfidence(uint8_t old_conf){
         return old_conf;
     }
 
-    uint8_t new_conf;
-
     //rand float between 0.0 and 1.0 inclusive
     float randNum = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
 
     if(randNum <= CONFIDENCE_TRANSITION_VECTOR[old_conf]){
+        uint8_t new_conf;
         new_conf = old_conf + 1;
+
+        return new_conf;
     }
 
     return old_conf;
@@ -115,6 +117,7 @@ bool isCorrectPred(uint64_t &predictedAddr, uint64_t& actualAddr, uint64_t pc){
         // Incorrect prediction. Reset confidence and re-allocate entry
         return false;
     }
+    return false;
 }
 
 void updateStats(uint64_t &predictedAddr, uint64_t& actualAddr, uint64_t pc){

@@ -242,7 +242,6 @@ SimpleCache::handleResponse(PacketPtr pkt)
         Addr* predictedAddr_ptr = 0;  // getPrediction will modify value pointed to by this
 
         // myPred object of mypredictor type
-        
 
         updateLoadPathHistory(reqPC);
 

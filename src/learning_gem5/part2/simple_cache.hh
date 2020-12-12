@@ -38,6 +38,10 @@
 
 #include "mypredictor.h"
 
+// extern stats myStats;
+// extern APTEntry myAPT[APT_SIZE];
+// extern uint32_t loadPathHistory;
+
 /**
  * A very simple cache object. Has a fully-associative data store with random
  * replacement.
