@@ -239,25 +239,26 @@ SimpleCache::handleResponse(PacketPtr pkt)
         Addr actualAddr = pkt->getAddr();
         RequestPtr theReq = pkt->req;
         Addr reqPC = theReq->getPC();
-        Addr* predictedAddr_ptr = 0;  // getPrediction will modify value pointed to by this
+        // Addr* predictedAddr_ptr = nullptr;  // getPrediction will modify value pointed to by this
 
         // myPred object of mypredictor type
 
         updateLoadPathHistory(reqPC);
 
-        bool hasPrediction = getPrediction(reqPC, predictedAddr_ptr);
+        // bool hasPrediction = getPrediction(reqPC, predictedAddr_ptr);
+        uint64_t predictedAddr = getPredictionRaw(reqPC);
 
-        if (hasPrediction){
-            Addr predictedAddr = *predictedAddr_ptr;
+        if ( predictedAddr != 0){//hasPrediction){
+            //Addr predictedAddr = *predictedAddr_ptr;
 
             updateStats(predictedAddr, actualAddr, reqPC);
 
-            printStats();
-
-            trainAPT(predictedAddr, actualAddr, reqPC);
+            printStats();            
 
             DPRINTF(DLVPDebug, "Predicted load with PC: %" PRIx64 "\nPredicted address was: %" PRIu64 "\nActual was: %" PRIu64 "\n", reqPC, predictedAddr , actualAddr);
         }
+
+        trainAPT(predictedAddr, actualAddr, reqPC);
 
         
     }// end load address prediction

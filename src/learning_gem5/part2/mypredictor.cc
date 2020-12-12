@@ -32,16 +32,16 @@ void updateLoadPathHistory(uint64_t pc){
     loadPathHistory = loadPathHistory + third_bit;
 }
 
-int calcAPTIndex(uint64_t pc){
-    int ind;
+unsigned int calcAPTIndex(uint64_t pc){
+    uint ind;
     //uint32_t lower_pc = (uint32_t) pc;
     ind = (uint32_t) pc ^ loadPathHistory;
 
     return ind;
 }
 
-int calcAPTTag(uint64_t pc){
-    int tag = calcAPTIndex(pc);
+unsigned int calcAPTTag(uint64_t pc){
+    unsigned int tag = calcAPTIndex(pc);
     tag = tag % TAG_BIT_LENGTH;
     return tag;
 }
@@ -63,8 +63,11 @@ bool queryAPTHitMiss(unsigned int index_raw){
 
 APTEntry getAPTEntry(unsigned int index){
     // Assure index in bounds
-    index = index % APT_SIZE;
-    return myAPT[index];
+    index = index % (APT_SIZE - 1);
+
+    APTEntry entry = myAPT[index];
+
+    return entry;
 }
 
 void setAPTEntry(unsigned int index, APTEntry entry){
@@ -105,7 +108,7 @@ APTEntry allocateNew(uint64_t address, uint64_t pc){
 }
 
 bool isCorrectPred(uint64_t &predictedAddr, uint64_t& actualAddr, uint64_t pc){
-    int indexAPT = calcAPTIndex(pc);
+    unsigned int indexAPT = calcAPTIndex(pc);
 
     bool hit = queryAPTHitMiss(indexAPT);
 
@@ -133,7 +136,7 @@ void printStats(){
 }
 
 void trainAPT(uint64_t &predictedAddr, uint64_t& actualAddr, uint64_t pc){
-    int indexAPT = calcAPTIndex(pc);
+    unsigned int indexAPT = calcAPTIndex(pc);
 
     bool hit = queryAPTHitMiss(indexAPT);
 
@@ -145,6 +148,7 @@ void trainAPT(uint64_t &predictedAddr, uint64_t& actualAddr, uint64_t pc){
     if(hit){
         // Correct prediction. Increment according to probability vector
         if(predictedAddr == actualAddr){
+            std::cout<<"IT WAS CORRECT"<<std::endl;
             uint8_t conf = entry.confidence;
             uint8_t new_conf = incrementConfidence(conf);
             entry.confidence = new_conf;
@@ -188,18 +192,39 @@ bool getPrediction(uint64_t pc, uint64_t* predicted_address_ptr){
     // manually called
     // updateLoadPathHistory(pc); 
 
-    int indexAPT;
+    uint indexAPT;
     indexAPT = calcAPTIndex(pc);
 
     bool hit = queryAPTHitMiss(indexAPT);
 
     if(hit){
-        std::cout<<"hit"<<std::endl;
+        std::cout<<"hit orig"<<std::endl;
         APTEntry entry = getAPTEntry(indexAPT);
         *predicted_address_ptr = entry.address;
     }
     else{
-        std::cout<<"miss"<<std::endl;
+        std::cout<<"miss orig"<<std::endl;
     }
     return hit;
+}
+
+uint64_t getPredictionRaw(uint64_t pc){
+    unsigned int indexAPT = calcAPTIndex(pc);
+
+    bool hit = queryAPTHitMiss(indexAPT);
+
+    uint64_t prediction = 0;
+
+    if(hit){
+        //unsigned int moduloIndex = indexAPT % APT_SIZE;
+        APTEntry entry = getAPTEntry(indexAPT);
+        prediction = entry.address;
+
+        //std::cout<<"hit on index "<<moduloIndex<<" and prediction is "<<prediction<<std::endl;
+    }
+    // else{
+    //     std::cout<<"miss"<<std::endl;
+    // }
+
+    return prediction;
 }

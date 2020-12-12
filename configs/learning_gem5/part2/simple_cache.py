@@ -88,8 +88,23 @@ process = Process()
 # Set the command
 # grab the specific path to the binary
 thispath = os.path.dirname(os.path.realpath(__file__))
-binpath = os.path.join(thispath, '../../../',
-                       'tests/test-progs/hello/bin/x86/linux/hello')
+
+
+# SPEC2k6
+
+bench_dir='/home/min/a/ece565/benchspec-2020/CPU2006/'
+bzip2_dir = '401.bzip2/'
+
+# X86
+benchtype = '-m64-gcc43-nn'
+
+specific = '/exe/bzip2_base.amd64'
+
+binpath =  os.path.join(bench_dir + bzip2_dir + specific + benchtype)
+
+
+# binpath = os.path.join(thispath, '../../../',
+#                        'tests/test-progs/hello/bin/x86/linux/hello')
 # cmd is a list which begins with the executable (like argv)
 process.cmd = [binpath]
 # Set the cpu to use the process as its workload and create thread contexts

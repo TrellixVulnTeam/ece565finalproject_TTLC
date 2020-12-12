@@ -1,5 +1,5 @@
 /*
-Title: mypredictor.h
+Title: mypredictor
 Author: Conor Green
 Purpose: Final Project for ECE565
 Description: Header file to provide definitions for mypredictor.cc
@@ -58,8 +58,8 @@ void printBinaryNumber(unsigned int number);
 
 void updateLoadPathHistory(uint64_t pc);
 
-int calcAPTIndex(uint64_t pc);
-int calcAPTTag(uint64_t pc);
+unsigned int calcAPTIndex(uint64_t pc);
+unsigned int calcAPTTag(uint64_t pc);
 
 bool queryAPTHitMiss(unsigned int index_raw);
 
@@ -79,6 +79,8 @@ void printStats();
 void trainAPT(uint64_t &predicted_val, uint64_t& actual_val, uint64_t pc);
 
 bool getPrediction(uint64_t pc, uint64_t* predicted_value);
+
+uint64_t getPredictionRaw(uint64_t pc);
 
 //int main();
 
