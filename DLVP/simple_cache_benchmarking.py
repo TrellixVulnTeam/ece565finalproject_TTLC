@@ -67,6 +67,10 @@ parser = optparse.OptionParser()
 parser.add_option("-b", "--benchmark", default="",
                  help="The benchmark to be loaded.")
 
+# Run duration options
+parser.add_option("-I", "--maxinsts", action="store", type="int",
+    default=100000000, help="""Total number of instructions to simulate (default: run forever)""")
+
 (options, args) = parser.parse_args()
 
 print(options)
@@ -126,11 +130,14 @@ process = spec2k6_simple_cache.get_process(options)
 system.cpu.workload = process
 system.cpu.createThreads()
 
+max_i = options.maxinsts
+system.cpu.max_insts_any_thread = max_i
+
 # set up the root SimObject and start the simulation
 root = Root(full_system = False, system = system)
 # instantiate all of the objects we've created above
 m5.instantiate()
 
 print("Beginning simulation!")
-exit_event = m5.simulate()
+exit_event = m5.simulate()#options)
 print('Exiting @ tick %i because %s' % (m5.curTick(), exit_event.getCause()))
